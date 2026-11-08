@@ -1,6 +1,6 @@
 # Setup guide
 
-Covers Phases 1–3: Authentication, Firestore and Cloud Functions. Later phases add Groq, AdMob, Billing and release signing.
+Covers Phases 1–4: Authentication, Firestore, Cloud Functions and the Groq AI features. Later phases add AdMob, Billing and release signing.
 
 ## 1. Tools
 - Flutter stable (built and tested with 3.47.9 / Dart 3.13)
@@ -63,6 +63,29 @@ What gets deployed:
 | `sendFriendRequest` / `respondFriendRequest` / `removeFriend` | callable | friends system |
 | `weeklyLeaderboardReset` | scheduled, Mon 00:05 UTC | closes last week, gives the top 3 trophies (30/20/10), deletes boards older than 12 weeks |
 
+## 5b. Groq AI (Phase 4)
+
+The Groq key lives **only** in Cloud Functions, stored as a Secret Manager secret. It never ships in the app.
+
+1. Create a key at https://console.groq.com/keys.
+2. Store it as a secret, then check it against the real API:
+   ```bash
+   firebase functions:secrets:set GROQ_API_KEY     # paste the key when asked
+   cd functions && GROQ_API_KEY=gsk_... npm run smoke:groq
+   ```
+   (`functions:secrets:set` replaces the old `functions:config:set`, which is deprecated.)
+3. Optional: choose the model with a parameter. The default is `llama-3.3-70b-versatile`. Put it in `functions/.env.<your-project-id>`:
+   ```
+   GROQ_MODEL=llama-3.1-8b-instant
+   ```
+4. Deploy: `firebase deploy --only functions`.
+
+| Function | Purpose |
+|---|---|
+| `getBrainCoachTip` | After the Daily Workout, reads that day's accepted rounds and the player's skills. It asks Groq for one tip and one brain fact (numbers only, no user text in the prompt) and caches the result in `coachTips/{uid}_{day}`. If Groq fails it returns a written tip; after 3 failed tries it stops calling Groq for that day. |
+| `getEndlessPuzzle` | Asks Groq to write a puzzle (sequence, riddle or logic) at a difficulty set by the current run. A second Groq call has to solve it independently and confidently, and sequences must also pass a rule check, or the puzzle is thrown away. Puzzles are stored in `endlessPuzzles` with the answer; clients cannot read that collection. Free players get 10 a day and `users.entitlements.pro` is unlimited. If Groq is down, an algorithmic number-sequence puzzle is served. |
+| `submitEndlessAnswer` | Checks the answer on the server (late answers after 60 s count as wrong) and updates the run, lives (3) and best run in `users.endless`. |
+
 ### Firestore schema
 
 | Path | Written by | Fields |
@@ -77,6 +100,9 @@ What gets deployed:
 | `friends/{uid}/requests/{fromUid}` | server (owner may delete) | `fromUid, fromUsername, fromDisplayName, createdAt` |
 | `achievements/{uid}` | server | `unlocked{badgeId: timestamp}` |
 | `dailyWorkouts/{uid}/days/{yyyy-MM-dd}` | owner | `games[], completed[], updatedAt` |
+| `coachTips/{uid}_{day}` | server | `uid, day, tip, funFact, focusSkill, source (ai/fallback), attempts, createdAt` |
+| `endlessPuzzles/{id}` | server (never client-readable) | `uid, kind, question, choices[4], answerIndex, explanation, difficulty, source, answered, correct, givenIndex, createdAt, answeredAt` |
+| `users/{uid}.endless` | server | `day, used, run, lives, bestRun, solved, activePuzzleId, recent[hash…50]` |
 | `purchases/{id}` | server (Phase 6) | — |
 | `battles/{id}` | server (Phase 5) | — |
 
@@ -106,5 +132,6 @@ flutter run --dart-define=USE_EMULATORS=true --dart-define=EMULATOR_HOST=192.168
 cd functions
 npm test                 # unit tests: validation, rewards, achievements, weeks
 npm run test:rules       # security rules on the Firestore emulator (needs Java 11+)
-npm run test:emulators   # end-to-end: real callables on Auth + Firestore + Functions emulators
+npm run test:emulators   # end-to-end: real callables on Auth + Firestore + Functions emulators (AI uses a mock Groq)
+npm run smoke:groq       # live AI prompts against Groq (needs GROQ_API_KEY)
 ```

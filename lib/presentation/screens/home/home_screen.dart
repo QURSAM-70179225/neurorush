@@ -10,6 +10,7 @@ import '../../../domain/entities/game_type.dart';
 import '../../../domain/logic/brain_score.dart';
 import '../../providers/app_providers.dart';
 import '../../widgets/brain_widgets.dart';
+import '../../widgets/coach_card.dart';
 import '../../widgets/common.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -63,6 +64,8 @@ class HomeScreen extends ConsumerWidget {
             _BrainScoreCard(testDone: progress.brainTestDone),
             const SizedBox(height: 12),
             const _DailyWorkoutCard(),
+            const SizedBox(height: 12),
+            const CoachCard(),
             SectionHeader('Quick play',
                 trailing: TextButton(onPressed: () => context.go('/games'), child: const Text('All games'))),
             for (final (i, t) in _suggested(history).indexed) ...[

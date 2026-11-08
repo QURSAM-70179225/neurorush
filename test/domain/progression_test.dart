@@ -221,6 +221,18 @@ void main() {
       expect(w.nextGame, isNot(GameType.numberSequence));
     });
 
+    test('playing the workout does not change it during the day', () {
+      final yesterday = [sampleResult(type: GameType.speedMath, score: 3000, maxLevel: 10, at: d(9))];
+      final before = DailyWorkout.build(history: yesterday, now: d(10));
+      final played = [
+        for (final (i, g) in before.games.indexed) sampleResult(type: g, score: 4000, maxLevel: 10, id: 't$i', at: d(10).add(const Duration(hours: 9))),
+        ...yesterday,
+      ];
+      final after = DailyWorkout.build(history: played, now: d(10).add(const Duration(hours: 20)));
+      expect(after.games, before.games);
+      expect(after.isComplete, isTrue);
+    });
+
     test('same day gives the same workout', () {
       final a = DailyWorkout.build(history: const [], now: DateTime(2026, 3, 10, 8));
       final b = DailyWorkout.build(history: const [], now: DateTime(2026, 3, 10, 22));

@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:neurorush/core/feedback/feedback_service.dart';
 import 'package:neurorush/data/repositories/offline_cloud_repository.dart';
 import 'package:neurorush/domain/entities/achievement.dart';
+import 'package:neurorush/domain/entities/ai_models.dart';
 import 'package:neurorush/domain/entities/cloud_models.dart';
 import 'package:neurorush/domain/repositories/cloud_repository.dart';
 import 'package:neurorush/presentation/providers/cloud_providers.dart';
@@ -400,5 +401,59 @@ class FakeCloudRepository implements CloudRepository {
   Future<void> saveDailyWorkout(String uid, String day, List<String> games, List<String> completed) async {
     _check();
     calls.add('workout:$day');
+  }
+
+  // --- AI ----------------------------------------------------------------------
+  CoachTip? coachTip;
+  Object? coachError;
+  int coachCalls = 0;
+
+  @override
+  Future<CoachTip> getCoachTip(String day, int tzOffsetMinutes) async {
+    _check();
+    coachCalls++;
+    if (coachError != null) throw coachError!;
+    return coachTip!;
+  }
+
+  /// Puzzles to serve, with their correct answer index.
+  final List<(EndlessPuzzle, int, String)> endlessQueue = [];
+  final Map<String, (int, String)> _answers = {};
+  int endlessRun = 0, endlessLives = 3, endlessBest = 0;
+  Object? endlessError;
+  final List<String> endlessAnswers = [];
+
+  @override
+  Future<EndlessPuzzle> getEndlessPuzzle({bool newRun = false}) async {
+    _check();
+    if (endlessError != null) throw endlessError!;
+    if (newRun || endlessLives == 0) {
+      endlessRun = 0;
+      endlessLives = 3;
+    }
+    final (p, answer, explanation) = endlessQueue.removeAt(0);
+    _answers[p.id] = (answer, explanation);
+    return EndlessPuzzle(
+      id: p.id, kind: p.kind, question: p.question, choices: p.choices, difficulty: p.difficulty, isAi: p.isAi,
+      run: endlessRun, lives: endlessLives, bestRun: endlessBest, remainingToday: p.remainingToday,
+    );
+  }
+
+  @override
+  Future<EndlessVerdict> submitEndlessAnswer(String puzzleId, int answerIndex) async {
+    _check();
+    endlessAnswers.add('$puzzleId:$answerIndex');
+    final (answer, explanation) = _answers.remove(puzzleId)!;
+    final correct = answer == answerIndex;
+    if (correct) {
+      endlessRun++;
+      if (endlessRun > endlessBest) endlessBest = endlessRun;
+    } else {
+      endlessLives--;
+    }
+    return EndlessVerdict(
+      correct: correct, answerIndex: answer, explanation: explanation, run: endlessRun, lives: endlessLives,
+      bestRun: endlessBest, gameOver: endlessLives == 0, timedOut: answerIndex == -1,
+    );
   }
 }

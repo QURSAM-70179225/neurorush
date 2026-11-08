@@ -1,3 +1,4 @@
+import '../../domain/entities/ai_models.dart';
 import '../../domain/entities/cloud_models.dart';
 import '../../domain/entities/game_result.dart';
 import '../../domain/repositories/cloud_repository.dart';
@@ -43,4 +44,11 @@ class OfflineCloudRepository implements CloudRepository {
   @override
   Future<void> saveDailyWorkout(String uid, String day, List<String> games, List<String> completed) =>
       Future.error(_unavailable);
+
+  @override
+  Future<CoachTip> getCoachTip(String day, int tzOffsetMinutes) => Future.error(_unavailable);
+  @override
+  Future<EndlessPuzzle> getEndlessPuzzle({bool newRun = false}) => Future.error(_unavailable);
+  @override
+  Future<EndlessVerdict> submitEndlessAnswer(String puzzleId, int answerIndex) => Future.error(_unavailable);
 }

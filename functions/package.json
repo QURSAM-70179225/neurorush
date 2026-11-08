@@ -11,7 +11,8 @@
     "test": "npm run copy-shared && jest",
     "test:rules": "firebase emulators:exec --only firestore --project demo-neurorush \"jest --config jest.rules.config.js\"",
     "deploy": "firebase deploy --only functions",
-    "test:emulators": "npm run build && firebase emulators:exec --only firestore,functions,auth --project demo-neurorush \"jest --config jest.emulator.config.js\""
+    "test:emulators": "npm run build && node scripts/emulator-env.js && cd .. && firebase emulators:exec --only firestore,functions,auth --project demo-neurorush \"cd functions && npx jest --config jest.emulator.config.js\"",
+    "smoke:groq": "npm run build && node scripts/groq-smoke.js"
   },
   "dependencies": {
     "firebase-admin": "^14.5.0",

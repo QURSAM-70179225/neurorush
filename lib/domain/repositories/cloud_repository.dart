@@ -1,3 +1,4 @@
+import '../entities/ai_models.dart';
 import '../entities/cloud_models.dart';
 import '../entities/game_result.dart';
 
@@ -11,8 +12,11 @@ class CloudUnavailable implements Exception {
 
 /// The server refused the request; [message] is safe to show.
 class CloudFailure implements Exception {
-  const CloudFailure(this.message);
+  const CloudFailure(this.message, {this.code});
   final String message;
+
+  /// Server error code, e.g. "resource-exhausted" or "failed-precondition".
+  final String? code;
   @override
   String toString() => message;
 }
@@ -42,4 +46,13 @@ abstract interface class CloudRepository {
   Stream<Map<String, DateTime>> watchUnlockedAchievements(String uid);
 
   Future<void> saveDailyWorkout(String uid, String day, List<String> games, List<String> completed);
+
+  /// AI Brain Coach tip for the player's local [day] (yyyy-MM-dd).
+  Future<CoachTip> getCoachTip(String day, int tzOffsetMinutes);
+
+  /// Next Endless puzzle; [newRun] starts over with full lives.
+  Future<EndlessPuzzle> getEndlessPuzzle({bool newRun = false});
+
+  /// [answerIndex] -1 means the timer ran out.
+  Future<EndlessVerdict> submitEndlessAnswer(String puzzleId, int answerIndex);
 }

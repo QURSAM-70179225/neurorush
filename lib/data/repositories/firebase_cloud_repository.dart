@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../../domain/entities/ai_models.dart';
 import '../../domain/entities/cloud_models.dart';
 import '../../domain/entities/game_result.dart';
 import '../../domain/entities/game_type.dart';
@@ -23,16 +24,20 @@ class FirebaseCloudRepository implements CloudRepository {
 
   // --- helpers --------------------------------------------------------------
 
-  static const _retryable = {'unavailable', 'deadline-exceeded', 'internal', 'unknown', 'resource-exhausted', 'aborted'};
+  static const _retryable = {'unavailable', 'deadline-exceeded', 'internal', 'unknown', 'aborted'};
 
   Future<Map<String, dynamic>> _call(String name, Map<String, Object?> data) async {
     try {
-      final res = await _functions.httpsCallable(name).call<Object?>(data).timeout(const Duration(seconds: 20));
+      // AI calls (generate + verify) can take longer than plain writes.
+      final res = await _functions
+          .httpsCallable(name, options: HttpsCallableOptions(timeout: const Duration(seconds: 60)))
+          .call<Object?>(data)
+          .timeout(const Duration(seconds: 65));
       final out = res.data;
       return out is Map ? Map<String, dynamic>.from(out) : <String, dynamic>{};
     } on FirebaseFunctionsException catch (e) {
       if (_retryable.contains(e.code)) throw const CloudUnavailable();
-      throw CloudFailure(e.message ?? 'Request failed (${e.code}).');
+      throw CloudFailure(e.message ?? 'Request failed (${e.code}).', code: e.code);
     } on TimeoutException {
       throw const CloudUnavailable();
     } on FirebaseException catch (e) {
@@ -277,4 +282,46 @@ class FirebaseCloudRepository implements CloudRepository {
           'updatedAt': FieldValue.serverTimestamp(),
         }),
       );
+
+  // --- AI ---------------------------------------------------------------------
+
+  @override
+  Future<CoachTip> getCoachTip(String day, int tzOffsetMinutes) async {
+    final r = await _call('getBrainCoachTip', {'day': day, 'tzOffsetMinutes': tzOffsetMinutes});
+    final tip = CoachTip.tryFromMap(r);
+    if (tip == null) throw const CloudFailure('The coach could not answer right now.');
+    return tip;
+  }
+
+  @override
+  Future<EndlessPuzzle> getEndlessPuzzle({bool newRun = false}) async {
+    final r = await _call('getEndlessPuzzle', {'newRun': newRun});
+    return EndlessPuzzle(
+      id: r['puzzleId'] as String,
+      kind: r['kind'] as String? ?? 'logic',
+      question: r['question'] as String,
+      choices: [for (final c in r['choices'] as List) '$c'],
+      difficulty: _int(r['difficulty'], 1),
+      isAi: r['source'] == 'ai',
+      run: _int(r['run']),
+      lives: _int(r['lives'], 3),
+      bestRun: _int(r['bestRun']),
+      remainingToday: (r['remainingToday'] as num?)?.toInt(),
+    );
+  }
+
+  @override
+  Future<EndlessVerdict> submitEndlessAnswer(String puzzleId, int answerIndex) async {
+    final r = await _call('submitEndlessAnswer', {'puzzleId': puzzleId, 'answerIndex': answerIndex});
+    return EndlessVerdict(
+      correct: r['correct'] == true,
+      answerIndex: _int(r['answerIndex']),
+      explanation: r['explanation'] as String? ?? '',
+      run: _int(r['run']),
+      lives: _int(r['lives']),
+      bestRun: _int(r['bestRun']),
+      gameOver: r['gameOver'] == true,
+      timedOut: r['timedOut'] == true,
+    );
+  }
 }

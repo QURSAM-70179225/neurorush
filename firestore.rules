@@ -94,6 +94,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // AI coach tips (cached by getBrainCoachTip). Owner may read.
+    match /coachTips/{id} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    // Endless puzzles contain the answer: never readable by clients.
+    match /endlessPuzzles/{id} {
+      allow read, write: if false;
+    }
+
     // Purchases are verified and recorded server-side (Phase 6).
     match /purchases/{id} {
       allow read: if signedIn() && resource.data.uid == request.auth.uid;

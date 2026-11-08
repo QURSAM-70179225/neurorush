@@ -121,3 +121,16 @@ describe('exact client operations (lib/data/repositories/firebase_cloud_reposito
     await assertFails(getDocs(collection(bob(), 'friends/alice/list')));
   });
 });
+
+describe('AI collections', () => {
+  test('endless puzzles (with answers) are never readable; coach tips only by owner', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'endlessPuzzles/p1'), { uid: 'alice', answerIndex: 2 });
+      await setDoc(doc(ctx.firestore(), 'coachTips/alice_2026-11-08'), { uid: 'alice', tip: 'x' });
+    });
+    await assertFails(getDoc(doc(alice(), 'endlessPuzzles/p1')));
+    await assertSucceeds(getDoc(doc(alice(), 'coachTips/alice_2026-11-08')));
+    await assertFails(getDoc(doc(bob(), 'coachTips/alice_2026-11-08')));
+    await assertFails(setDoc(doc(alice(), 'coachTips/alice_2026-11-09'), { uid: 'alice', tip: 'fake' }));
+  });
+});

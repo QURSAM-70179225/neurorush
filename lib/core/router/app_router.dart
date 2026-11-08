@@ -13,6 +13,7 @@ import '../../presentation/screens/auth/auth_screen.dart';
 import '../../presentation/screens/battle/battle_screen.dart';
 import '../../presentation/screens/brain/brain_screen.dart';
 import '../../presentation/screens/brain_test/brain_test_screen.dart';
+import '../../presentation/screens/endless/endless_screen.dart';
 import '../../presentation/screens/friends/friends_screen.dart';
 import '../../presentation/screens/games/games_screen.dart';
 import '../../presentation/screens/home/home_screen.dart';
@@ -54,6 +55,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
       GoRoute(path: '/brain', builder: (_, _) => const BrainScreen()),
       GoRoute(path: '/friends', builder: (_, _) => const FriendsScreen()),
+      GoRoute(path: '/endless', builder: (_, _) => const EndlessScreen()),
       GoRoute(path: '/achievements', builder: (_, _) => const AchievementsScreen()),
       GoRoute(path: '/brain-test', builder: (_, _) => const BrainTestScreen()),
       GoRoute(

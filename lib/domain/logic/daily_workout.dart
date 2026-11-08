@@ -20,11 +20,14 @@ class DailyWorkout {
 
   /// Picks 3 games for the weakest skills (ties broken by fewest rounds
   /// played). When a skill has several games, the choice rotates by day.
+  /// Only rounds from before today are used, so the workout stays the same
+  /// all day even as playing it changes the skill scores.
   static DailyWorkout build({required List<GameResult> history, required DateTime now}) {
     final day = dayOf(now);
-    final score = BrainScore.fromHistory(history);
+    final before = history.where((r) => r.playedAt.isBefore(day)).toList();
+    final score = BrainScore.fromHistory(before);
     final counts = {for (final s in Skill.values) s: 0};
-    for (final r in history) {
+    for (final r in before) {
       counts[r.gameType.skill] = counts[r.gameType.skill]! + 1;
     }
     final skills = [...Skill.values]
