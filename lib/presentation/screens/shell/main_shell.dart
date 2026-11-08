@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../providers/app_providers.dart';
+import '../../providers/battle_providers.dart';
 import '../../providers/cloud_providers.dart';
 
 /// Bottom navigation: Home, Games, Battle, Leaderboard, Profile. Also checks
@@ -48,6 +49,8 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
 
   @override
   Widget build(BuildContext context) {
+    // Registers for push once signed in (and re-saves when settings change).
+    ref.watch(pushRegistrarProvider);
     final shell = widget.navigationShell;
     return Scaffold(
       body: shell,

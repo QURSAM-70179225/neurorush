@@ -12,6 +12,10 @@ class AppSettings {
     this.onboardingDone = false,
     this.wordLanguage = WordLanguage.english,
     this.brainTestOffered = false,
+    this.notifyStreak = true,
+    this.notifyWorkout = true,
+    this.notifyFriends = true,
+    this.notifyBattle = true,
   });
 
   final AppThemeMode themeMode;
@@ -27,6 +31,12 @@ class AppSettings {
   /// Whether the Brain Test was already offered after sign-up.
   final bool brainTestOffered;
 
+  // Push notification preferences.
+  final bool notifyStreak;
+  final bool notifyWorkout;
+  final bool notifyFriends;
+  final bool notifyBattle;
+
   AppSettings copyWith({
     AppThemeMode? themeMode,
     bool? soundOn,
@@ -36,6 +46,10 @@ class AppSettings {
     bool? onboardingDone,
     WordLanguage? wordLanguage,
     bool? brainTestOffered,
+    bool? notifyStreak,
+    bool? notifyWorkout,
+    bool? notifyFriends,
+    bool? notifyBattle,
   }) =>
       AppSettings(
         themeMode: themeMode ?? this.themeMode,
@@ -46,6 +60,10 @@ class AppSettings {
         onboardingDone: onboardingDone ?? this.onboardingDone,
         wordLanguage: wordLanguage ?? this.wordLanguage,
         brainTestOffered: brainTestOffered ?? this.brainTestOffered,
+        notifyStreak: notifyStreak ?? this.notifyStreak,
+        notifyWorkout: notifyWorkout ?? this.notifyWorkout,
+        notifyFriends: notifyFriends ?? this.notifyFriends,
+        notifyBattle: notifyBattle ?? this.notifyBattle,
       );
 
   Map<String, dynamic> toMap() => {
@@ -57,6 +75,10 @@ class AppSettings {
         'onboardingDone': onboardingDone,
         'wordLanguage': wordLanguage.name,
         'brainTestOffered': brainTestOffered,
+        'notifyStreak': notifyStreak,
+        'notifyWorkout': notifyWorkout,
+        'notifyFriends': notifyFriends,
+        'notifyBattle': notifyBattle,
       };
 
   factory AppSettings.fromMap(Map<dynamic, dynamic> m) => AppSettings(
@@ -74,5 +96,9 @@ class AppSettings {
           orElse: () => WordLanguage.english,
         ),
         brainTestOffered: m['brainTestOffered'] as bool? ?? false,
+        notifyStreak: m['notifyStreak'] as bool? ?? true,
+        notifyWorkout: m['notifyWorkout'] as bool? ?? true,
+        notifyFriends: m['notifyFriends'] as bool? ?? true,
+        notifyBattle: m['notifyBattle'] as bool? ?? true,
       );
 }

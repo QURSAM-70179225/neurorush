@@ -1,6 +1,6 @@
 # Setup guide
 
-Covers Phases 1–4: Authentication, Firestore, Cloud Functions and the Groq AI features. Later phases add AdMob, Billing and release signing.
+Covers Phases 1–5: Authentication, Firestore, Cloud Functions, Groq AI, battles and push notifications. Later phases add AdMob, Billing and release signing.
 
 ## 1. Tools
 - Flutter stable (built and tested with 3.47.9 / Dart 3.13)
@@ -86,6 +86,31 @@ The Groq key lives **only** in Cloud Functions, stored as a Secret Manager secre
 | `getEndlessPuzzle` | Asks Groq to write a puzzle (sequence, riddle or logic) at a difficulty set by the current run. A second Groq call has to solve it independently and confidently, and sequences must also pass a rule check, or the puzzle is thrown away. Puzzles are stored in `endlessPuzzles` with the answer; clients cannot read that collection. Free players get 10 a day and `users.entitlements.pro` is unlimited. If Groq is down, an algorithmic number-sequence puzzle is served. |
 | `submitEndlessAnswer` | Checks the answer on the server (late answers after 60 s count as wrong) and updates the run, lives (3) and best run in `users.endless`. |
 
+## 5c. Battles and push notifications (Phase 5)
+
+There is no extra console setup for Android. Cloud Messaging is already on for Firebase projects, and `google-services.json` connects the app. On Android 13+ the app asks for notification permission after sign-in. Players can switch each notification type on or off in **Settings → Notifications**.
+
+| Function | Type | Purpose |
+|---|---|---|
+| `findMatch` / `cancelMatch` | callable | random matchmaking queue (`matchQueue/{uid}`; the waiting player listens for `battleId`) |
+| `startBotBattle` | callable | practice battle against Neo (bot answers are pre-planned and revealed on schedule) |
+| `createInvite` / `joinInvite` | callable | 6-character invite codes (valid 30 min) |
+| `challengeFriend` | callable | invite a friend and push them the code |
+| `submitBattleAnswer` | callable | checks the answer against hidden `battles/{id}/secret/answers` and times it on the server: 100 points + up to 100 for speed |
+| `tickBattle` | callable | moves practice battles along and keeps the app's clock in sync with the server |
+| `finishBattle` | callable | idempotent result: winner and trophies (ranked +30/−20, invite +15/−10, practice +10/0; never below 0) and `users.battleStats` |
+| `cleanupBattles` | every 10 min | finishes abandoned battles, expires invites, clears the stale queue |
+| `hourlyReminders` | hourly | streak reminder at the player's local 19:00 if their streak would break; "workout ready" at local 08:00 |
+| `notifyFriendsOnNewBest` | Firestore trigger | "Your friend beat your score!" when a weekly best overtakes a friend's |
+
+How a battle works:
+- Both players see the same 8 questions (math, colour-word, number sequence).
+- Each question is open for a fixed window (8 s) from `startAt`.
+- The app estimates the server clock from every function response, so both phones switch questions at the same moment.
+- Scores update live through a Firestore listener on `battles/{id}`.
+
+Pushes go to Firebase Installation IDs (the current FCM API). Devices the server can no longer reach are removed from the list automatically.
+
 ### Firestore schema
 
 | Path | Written by | Fields |
@@ -104,7 +129,12 @@ The Groq key lives **only** in Cloud Functions, stored as a Secret Manager secre
 | `endlessPuzzles/{id}` | server (never client-readable) | `uid, kind, question, choices[4], answerIndex, explanation, difficulty, source, answered, correct, givenIndex, createdAt, answeredAt` |
 | `users/{uid}.endless` | server | `day, used, run, lives, bestRun, solved, activePuzzleId, recent[hash…50]` |
 | `purchases/{id}` | server (Phase 6) | — |
-| `battles/{id}` | server (Phase 5) | — |
+| `battles/{id}` | server; readable by its 2 players | `mode (random/invite/bot), status (waiting/active/finished/expired), players[2], playerInfo{uid:{username,displayName,trophies,level}}, questions[8] (no answers), count, questionMs, startAt, endsAt, scores{uid}, answers{uid:{i:{correct,points,ms}}}, winner, trophyDelta{uid}, inviteCode, host, createdAt, finishedAt` |
+| `battles/{id}/secret/answers` | server only | `answers[8]`, `bot[8]{correct,ms}` |
+| `matchQueue/{uid}` | server; owner reads | `uid, info, battleId, createdAt` |
+| `invites/{code}` | server only | `battleId, host, createdAt` |
+| `pushTargets/{uid}` | owner | `tokens[≤10] (FIDs), tzOffsetMinutes, reminderHourUtc, workoutHourUtc, prefs{streak,workout,friends,battle}, updatedAt` |
+| `users/{uid}` (server) | | `trophies, battleStats{played,wins,losses,draws}` |
 
 Indexes are in `firestore.indexes.json`. Rules are in `firestore.rules`.
 
@@ -132,6 +162,6 @@ flutter run --dart-define=USE_EMULATORS=true --dart-define=EMULATOR_HOST=192.168
 cd functions
 npm test                 # unit tests: validation, rewards, achievements, weeks
 npm run test:rules       # security rules on the Firestore emulator (needs Java 11+)
-npm run test:emulators   # end-to-end: real callables on Auth + Firestore + Functions emulators (AI uses a mock Groq)
+npm run test:emulators   # end-to-end on Auth + Firestore + Functions emulators: scores, friends, AI (mock Groq), battles, push (dry-run log)
 npm run smoke:groq       # live AI prompts against Groq (needs GROQ_API_KEY)
 ```

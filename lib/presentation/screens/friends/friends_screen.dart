@@ -8,11 +8,15 @@ import '../../../domain/entities/countries.dart';
 import '../../../domain/entities/skill.dart';
 import '../../../domain/logic/brain_score.dart';
 import '../../../domain/repositories/cloud_repository.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../providers/app_providers.dart';
+import '../../providers/battle_providers.dart';
 import '../../providers/cloud_providers.dart';
 import '../../widgets/brain_widgets.dart';
 import '../../widgets/cloud_widgets.dart';
 import '../../widgets/common.dart';
+import '../../widgets/text_prompt_dialog.dart';
 
 class FriendsScreen extends ConsumerStatefulWidget {
   const FriendsScreen({super.key});
@@ -271,6 +275,23 @@ Future<void> showFriendSheet(BuildContext context, WidgetRef ref, CloudProfile f
             const SizedBox(height: 8),
             SkillRadarChart(score: BrainScore({for (final s in Skill.values) s: f.skills[s] ?? 0}), size: 240),
             const SizedBox(height: 8),
+            FilledButton.icon(
+              icon: const Icon(Icons.bolt_rounded),
+              label: const Text('Challenge to a battle'),
+              onPressed: () async {
+                Navigator.pop(c);
+                try {
+                  final (id, code, notified) = await ref.read(battleRepositoryProvider).challengeFriend(f.uid);
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(notified ? 'Challenge sent to ${f.name}!' : '${f.name} has notifications off — share code $code'),
+                  ));
+                  context.push('/battle/$id');
+                } catch (e) {
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(cloudErrorText(e))));
+                }
+              },
+            ),
             TextButton.icon(
               style: TextButton.styleFrom(foregroundColor: Theme.of(c).colorScheme.error),
               icon: const Icon(Icons.person_remove_rounded),
@@ -295,35 +316,15 @@ Future<void> showFriendSheet(BuildContext context, WidgetRef ref, CloudProfile f
 /// Dialog to choose or change the unique username.
 Future<void> showUsernameDialog(BuildContext context, WidgetRef ref) async {
   final current = ref.read(cloudProfileProvider).value?.username ?? '';
-  final controller = TextEditingController(text: current);
-  final formKey = GlobalKey<FormState>();
-  final name = await showDialog<String>(
-    context: context,
-    builder: (c) => AlertDialog(
-      title: const Text('Choose a username'),
-      content: Form(
-        key: formKey,
-        child: TextFormField(
-          controller: controller,
-          autofocus: true,
-          autocorrect: false,
-          decoration: const InputDecoration(prefixText: '@ ', helperText: '3–20 letters, numbers or _'),
-          validator: (v) =>
-              RegExp(r'^[a-zA-Z0-9_]{3,20}$').hasMatch(v?.trim() ?? '') ? null : 'Use 3–20 letters, numbers or _',
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')),
-        FilledButton(
-          onPressed: () {
-            if (formKey.currentState!.validate()) Navigator.pop(c, controller.text.trim());
-          },
-          child: const Text('Save'),
-        ),
-      ],
-    ),
+  final name = await showTextPrompt(
+    context,
+    title: 'Choose a username',
+    confirmLabel: 'Save',
+    initial: current,
+    prefixText: '@ ',
+    helperText: '3–20 letters, numbers or _',
+    validator: (v) => RegExp(r'^[a-zA-Z0-9_]{3,20}$').hasMatch(v) ? null : 'Use 3–20 letters, numbers or _',
   );
-  controller.dispose();
   if (name == null || name.toLowerCase() == current || !context.mounted) return;
   await runCloudAction(context, () async {
     final saved = await ref.read(cloudRepositoryProvider).claimUsername(name);

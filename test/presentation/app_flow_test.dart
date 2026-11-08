@@ -53,7 +53,7 @@ void main() {
 
     await tester.tap(find.text('Battle'));
     await tester.pumpAndSettle();
-    expect(find.text('Random round'), findsOneWidget);
+    expect(find.textContaining('Live battles need an online account'), findsOneWidget);
 
     await tester.tap(find.text('Leaderboard'));
     await tester.pumpAndSettle();

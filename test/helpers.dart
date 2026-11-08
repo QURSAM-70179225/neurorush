@@ -7,7 +7,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:neurorush/core/feedback/feedback_service.dart';
 import 'package:neurorush/data/repositories/offline_cloud_repository.dart';
 import 'package:neurorush/domain/entities/achievement.dart';
+import 'package:neurorush/core/push/push_service.dart';
 import 'package:neurorush/domain/entities/ai_models.dart';
+import 'package:neurorush/domain/entities/battle.dart';
+import 'package:neurorush/domain/repositories/battle_repository.dart';
+import 'package:neurorush/domain/repositories/push_repository.dart';
 import 'package:neurorush/domain/entities/cloud_models.dart';
 import 'package:neurorush/domain/repositories/cloud_repository.dart';
 import 'package:neurorush/presentation/providers/cloud_providers.dart';
@@ -455,5 +459,114 @@ class FakeCloudRepository implements CloudRepository {
       correct: correct, answerIndex: answer, explanation: explanation, run: endlessRun, lives: endlessLives,
       bestRun: endlessBest, gameOver: endlessLives == 0, timedOut: answerIndex == -1,
     );
+  }
+}
+
+/// Scriptable battle backend for widget tests.
+class FakeBattleRepository implements BattleRepository {
+  final calls = <String>[];
+  final _battles = <String, StreamController<Battle?>>{};
+  final _match = StreamController<String?>.broadcast();
+  String? matchImmediately;
+  Battle Function(String id, int index, int choice)? onAnswer;
+  AnswerResult Function(int index, int choice) answerResult =
+      (i, c) => const AnswerResult(correct: true, answerIndex: 0, points: 180);
+  void Function(String id)? onFinish;
+  List<Battle> recent = [];
+
+  StreamController<Battle?> _ctl(String id) => _battles.putIfAbsent(id, StreamController<Battle?>.broadcast);
+  final _last = <String, Battle?>{};
+
+  void emit(Battle b) {
+    _last[b.id] = b;
+    _ctl(b.id).add(b);
+  }
+
+  void emitMatch(String id) => _match.add(id);
+
+  @override
+  bool get isAvailable => true;
+  @override
+  Future<MatchResult> findMatch() async {
+    calls.add('findMatch');
+    return MatchResult(battleId: matchImmediately);
+  }
+
+  @override
+  Future<void> cancelMatch() async => calls.add('cancelMatch');
+  @override
+  Stream<String?> watchMatch(String uid) => _match.stream;
+  @override
+  Future<String> startBotBattle() async {
+    calls.add('bot');
+    return 'bot1';
+  }
+
+  @override
+  Future<(String, String)> createInvite() async {
+    calls.add('invite');
+    return ('inv1', 'ABC234');
+  }
+
+  @override
+  Future<String> joinInvite(String code) async {
+    calls.add('join:$code');
+    if (code == 'BADBAD') throw const CloudFailure('That code is not valid or has expired.');
+    return 'joined1';
+  }
+
+  @override
+  Future<(String, String, bool)> challengeFriend(String friendUid) async {
+    calls.add('challenge:$friendUid');
+    return ('inv2', 'XYZ789', true);
+  }
+
+  @override
+  Stream<Battle?> watchBattle(String battleId) async* {
+    if (_last[battleId] != null) yield _last[battleId];
+    yield* _ctl(battleId).stream;
+  }
+
+  @override
+  Future<AnswerResult> submitAnswer(String battleId, int index, int choice) async {
+    calls.add('answer:$index:$choice');
+    final updated = onAnswer?.call(battleId, index, choice);
+    if (updated != null) emit(updated);
+    return answerResult(index, choice);
+  }
+
+  @override
+  Future<void> tick(String battleId) async => calls.add('tick');
+  @override
+  Future<void> finish(String battleId) async {
+    calls.add('finish');
+    onFinish?.call(battleId);
+  }
+
+  @override
+  Future<List<Battle>> recentBattles(String uid) async => recent;
+}
+
+class FakePushService implements PushService {
+  final events$ = StreamController<PushEvent>.broadcast();
+  String? token = 'fid-123';
+  int registers = 0;
+  @override
+  Future<String?> register() async {
+    registers++;
+    return token;
+  }
+
+  @override
+  Stream<String> get tokenRefreshes => const Stream.empty();
+  @override
+  Stream<PushEvent> get events => events$.stream;
+}
+
+class FakePushRepository implements PushRepository {
+  final saves = <Map<String, Object?>>[];
+  @override
+  Future<void> saveTarget(String uid, {required String token, required int tzOffsetMinutes, required PushPrefs prefs}) async {
+    saves.add({'uid': uid, 'token': token, 'tz': tzOffsetMinutes, ...prefs.toMap()});
   }
 }

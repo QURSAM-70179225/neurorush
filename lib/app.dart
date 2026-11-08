@@ -5,6 +5,7 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'domain/entities/app_settings.dart';
 import 'presentation/providers/app_providers.dart';
+import 'presentation/widgets/push_listener.dart';
 
 class NeuroRushApp extends ConsumerWidget {
   const NeuroRushApp({super.key});
@@ -24,12 +25,14 @@ class NeuroRushApp extends ConsumerWidget {
         AppThemeMode.dark => ThemeMode.dark,
       },
       routerConfig: router,
+      scaffoldMessengerKey: scaffoldMessengerKey,
       builder: (context, child) {
-        if (!settings.largeText) return child!;
+        final app = PushListener(child: child!);
+        if (!settings.largeText) return app;
         final mq = MediaQuery.of(context);
         // Respect the system scale and add 25% on top, capped for layout safety.
         final scale = (mq.textScaler.scale(1) * 1.25).clamp(1.0, 2.0);
-        return MediaQuery(data: mq.copyWith(textScaler: TextScaler.linear(scale)), child: child!);
+        return MediaQuery(data: mq.copyWith(textScaler: TextScaler.linear(scale)), child: app);
       },
     );
   }

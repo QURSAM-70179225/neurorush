@@ -31,14 +31,15 @@ export async function sendPush(uid: string, kind: PushKind, msg: PushMessage): P
     await db.collection('pushLog').add({ uid, kind, ...msg, devices: tokens.length, at: FieldValue.serverTimestamp() });
     return tokens.length;
   }
+  // Devices register Firebase Installation IDs (FIDs), the current FCM target.
   const res = await getMessaging().sendEachForMulticast({
-    tokens,
+    fids: tokens,
     notification: { title: msg.title, body: msg.body },
     data: { ...msg.data, kind },
     android: { priority: 'high' },
   });
   const dead = res.responses
-    .map((r, i) => (!r.success && ['messaging/registration-token-not-registered', 'messaging/invalid-registration-token'].includes(r.error?.code ?? '') ? tokens[i] : null))
+    .map((r, i) => (!r.success && ['messaging/installation-id-not-registered', 'messaging/registration-token-not-registered', 'messaging/invalid-argument'].includes(r.error?.code ?? '') ? tokens[i] : null))
     .filter((t): t is string => t !== null);
   if (dead.length) await ref.update({ tokens: FieldValue.arrayRemove(...dead) });
   if (res.failureCount > dead.length) logger.warn('Push failures', { uid, failures: res.failureCount });

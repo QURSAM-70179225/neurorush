@@ -18,6 +18,9 @@ class CloudProfile {
     this.streakDay,
     this.friends = 0,
     this.trophies = 0,
+    this.battleWins = 0,
+    this.battleLosses = 0,
+    this.battleDraws = 0,
     this.lastActiveAt,
   });
 
@@ -38,6 +41,9 @@ class CloudProfile {
   final String? streakDay;
   final int friends;
   final int trophies;
+  final int battleWins;
+  final int battleLosses;
+  final int battleDraws;
   final DateTime? lastActiveAt;
 
   String get name {

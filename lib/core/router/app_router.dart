@@ -11,6 +11,8 @@ import '../../presentation/providers/app_providers.dart';
 import '../../presentation/screens/achievements/achievements_screen.dart';
 import '../../presentation/screens/auth/auth_screen.dart';
 import '../../presentation/screens/battle/battle_screen.dart';
+import '../../presentation/screens/battle/live_battle_screen.dart';
+import '../../presentation/screens/battle/matchmaking_screen.dart';
 import '../../presentation/screens/brain/brain_screen.dart';
 import '../../presentation/screens/brain_test/brain_test_screen.dart';
 import '../../presentation/screens/endless/endless_screen.dart';
@@ -56,6 +58,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/brain', builder: (_, _) => const BrainScreen()),
       GoRoute(path: '/friends', builder: (_, _) => const FriendsScreen()),
       GoRoute(path: '/endless', builder: (_, _) => const EndlessScreen()),
+      GoRoute(path: '/battle/search', builder: (_, _) => const MatchmakingScreen()),
+      GoRoute(path: '/battle/join/:code', builder: (_, s) => JoinBattleScreen(code: s.pathParameters['code']!)),
+      GoRoute(path: '/battle/:id', builder: (_, s) => LiveBattleScreen(battleId: s.pathParameters['id']!)),
       GoRoute(path: '/achievements', builder: (_, _) => const AchievementsScreen()),
       GoRoute(path: '/brain-test', builder: (_, _) => const BrainTestScreen()),
       GoRoute(

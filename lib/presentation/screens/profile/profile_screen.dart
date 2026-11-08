@@ -38,47 +38,17 @@ class ProfileScreen extends ConsumerWidget {
     final uid = ref.read(currentUidProvider);
     if (uid == null) return;
     final profile = ref.read(cloudProfileProvider).value;
-    final name = TextEditingController(text: profile?.displayName ?? ref.read(currentUserProvider)?.displayName ?? '');
-    var country = ref.read(myCountryProvider);
-    final saved = await showModalBottomSheet<bool>(
+    final result = await showModalBottomSheet<(String, String)>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (c) => StatefulBuilder(
-        builder: (c, setSheet) => Padding(
-          padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.of(c).viewInsets.bottom),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Edit profile', style: Theme.of(c).textTheme.titleLarge),
-              const SizedBox(height: 16),
-              TextField(
-                controller: name,
-                maxLength: 30,
-                decoration: const InputDecoration(labelText: 'Display name'),
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                initialValue: country,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Country (for the country leaderboard)'),
-                items: [
-                  for (final (code, label) in countries)
-                    DropdownMenuItem(value: code, child: Text('${countryFlag(code)}  $label', overflow: TextOverflow.ellipsis)),
-                ],
-                onChanged: (v) => setSheet(() => country = v ?? country),
-              ),
-              const SizedBox(height: 16),
-              FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Save')),
-            ],
-          ),
-        ),
+      builder: (_) => _EditProfileSheet(
+        initialName: profile?.displayName ?? ref.read(currentUserProvider)?.displayName ?? '',
+        initialCountry: ref.read(myCountryProvider),
       ),
     );
-    final displayName = name.text.trim();
-    name.dispose();
-    if (saved != true || !context.mounted) return;
+    if (result == null || !context.mounted) return;
+    final (displayName, country) = result;
     await runCloudAction(
       context,
       () => ref.read(cloudRepositoryProvider).updateProfile(uid, {
@@ -296,4 +266,51 @@ class _SyncTile extends ConsumerWidget {
             ),
     );
   }
+}
+
+class _EditProfileSheet extends StatefulWidget {
+  const _EditProfileSheet({required this.initialName, required this.initialCountry});
+  final String initialName;
+  final String initialCountry;
+
+  @override
+  State<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends State<_EditProfileSheet> {
+  late final _name = TextEditingController(text: widget.initialName);
+  late String _country = widget.initialCountry;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Edit profile', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            TextField(controller: _name, maxLength: 30, decoration: const InputDecoration(labelText: 'Display name')),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              initialValue: _country,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Country (for the country leaderboard)'),
+              items: [
+                for (final (code, label) in countries)
+                  DropdownMenuItem(value: code, child: Text('${countryFlag(code)}  $label', overflow: TextOverflow.ellipsis)),
+              ],
+              onChanged: (v) => setState(() => _country = v ?? _country),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: () => Navigator.pop(context, (_name.text.trim(), _country)), child: const Text('Save')),
+          ],
+        ),
+      );
 }

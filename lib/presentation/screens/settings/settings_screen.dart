@@ -87,6 +87,40 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
           ),
+          const SectionHeader('Notifications'),
+          Card(
+            child: Column(
+              children: [
+                SwitchListTile(
+                  secondary: const Icon(Icons.local_fire_department_rounded),
+                  title: const Text('Streak reminders'),
+                  subtitle: const Text('At 7 pm if you haven’t played'),
+                  value: s.notifyStreak,
+                  onChanged: (v) => n.update((x) => x.copyWith(notifyStreak: v)),
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.fitness_center_rounded),
+                  title: const Text('Daily workout ready'),
+                  subtitle: const Text('At 8 am'),
+                  value: s.notifyWorkout,
+                  onChanged: (v) => n.update((x) => x.copyWith(notifyWorkout: v)),
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.group_rounded),
+                  title: const Text('Friends'),
+                  subtitle: const Text('Requests and “your friend beat your score”'),
+                  value: s.notifyFriends,
+                  onChanged: (v) => n.update((x) => x.copyWith(notifyFriends: v)),
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.bolt_rounded),
+                  title: const Text('Battle challenges'),
+                  value: s.notifyBattle,
+                  onChanged: (v) => n.update((x) => x.copyWith(notifyBattle: v)),
+                ),
+              ],
+            ),
+          ),
           const SectionHeader('Accessibility'),
           Card(
             child: Column(

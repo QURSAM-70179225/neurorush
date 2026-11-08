@@ -75,6 +75,9 @@ class FirebaseCloudRepository implements CloudRepository {
       streakDay: d['streakDay'] as String?,
       friends: _int(stats['friends']),
       trophies: _int(d['trophies']),
+      battleWins: _int((d['battleStats'] as Map?)?['wins']),
+      battleLosses: _int((d['battleStats'] as Map?)?['losses']),
+      battleDraws: _int((d['battleStats'] as Map?)?['draws']),
       lastActiveAt: (d['lastActiveAt'] as Timestamp?)?.toDate(),
     );
   }

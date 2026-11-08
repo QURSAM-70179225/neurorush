@@ -5,21 +5,30 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'core/feedback/feedback_service.dart';
+import 'core/push/push_service.dart';
 import 'data/local/hive_store.dart';
 import 'data/repositories/firebase_auth_repository.dart';
+import 'data/repositories/firebase_battle_repository.dart';
 import 'data/repositories/firebase_cloud_repository.dart';
+import 'data/repositories/firebase_push_repository.dart';
 import 'data/repositories/local_auth_repository.dart';
+import 'data/repositories/offline_battle_repository.dart';
 import 'data/repositories/offline_cloud_repository.dart';
 import 'domain/entities/achievement.dart';
+import 'domain/logic/server_clock.dart';
 import 'domain/repositories/auth_repository.dart';
+import 'domain/repositories/battle_repository.dart';
 import 'domain/repositories/cloud_repository.dart';
+import 'domain/repositories/push_repository.dart';
 import 'presentation/providers/app_providers.dart';
+import 'presentation/providers/battle_providers.dart';
 import 'presentation/providers/cloud_providers.dart';
 
 /// `flutter run --dart-define=USE_EMULATORS=true` talks to local Firebase
@@ -32,7 +41,8 @@ Future<void> main() async {
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   final store = await HiveStore.open();
-  final (auth, cloud) = await _createBackends(store);
+  final clock = ServerClock();
+  final b = await _createBackends(store, clock);
   final catalogue = Achievement.parseCatalogue(await rootBundle.loadString('shared/achievements.json'));
   final feedback = FeedbackService();
   unawaited(feedback.preload());
@@ -41,8 +51,12 @@ Future<void> main() async {
     ProviderScope(
       overrides: [
         hiveStoreProvider.overrideWithValue(store),
-        authRepositoryProvider.overrideWithValue(auth),
-        cloudRepositoryProvider.overrideWithValue(cloud),
+        authRepositoryProvider.overrideWithValue(b.auth),
+        cloudRepositoryProvider.overrideWithValue(b.cloud),
+        battleRepositoryProvider.overrideWithValue(b.battles),
+        pushServiceProvider.overrideWithValue(b.push),
+        pushRepositoryProvider.overrideWithValue(b.pushRepo),
+        serverClockProvider.overrideWithValue(clock),
         achievementCatalogProvider.overrideWithValue(catalogue),
         feedbackServiceProvider.overrideWithValue(feedback),
         connectivityRestoredProvider.overrideWithValue(_connectivityRestored()),
@@ -55,7 +69,15 @@ Future<void> main() async {
 /// Uses Firebase when the project is configured (google-services.json on
 /// Android). If Firebase cannot start, the app still works fully offline with
 /// a local guest profile.
-Future<(AuthRepository, CloudRepository)> _createBackends(HiveStore store) async {
+typedef _Backends = ({
+  AuthRepository auth,
+  CloudRepository cloud,
+  BattleRepository battles,
+  PushService push,
+  PushRepository? pushRepo,
+});
+
+Future<_Backends> _createBackends(HiveStore store, ServerClock clock) async {
   try {
     await Firebase.initializeApp().timeout(const Duration(seconds: 8));
     final auth = FirebaseAuth.instance;
@@ -70,10 +92,22 @@ Future<(AuthRepository, CloudRepository)> _createBackends(HiveStore store) async
     db.settings = const Settings(persistenceEnabled: true, cacheSizeBytes: 50 * 1024 * 1024);
     // Wait for the persisted session to be restored before routing.
     await auth.authStateChanges().first.timeout(const Duration(seconds: 5));
-    return (FirebaseAuthRepository(auth), FirebaseCloudRepository(db, functions));
+    return (
+      auth: FirebaseAuthRepository(auth),
+      cloud: FirebaseCloudRepository(db, functions),
+      battles: FirebaseBattleRepository(db, functions, clock),
+      push: FirebasePushService(FirebaseMessaging.instance),
+      pushRepo: FirebasePushRepository(db),
+    );
   } catch (e) {
     debugPrint('Firebase unavailable, running in offline mode: $e');
-    return (LocalAuthRepository(store.auth), const OfflineCloudRepository());
+    return (
+      auth: LocalAuthRepository(store.auth),
+      cloud: const OfflineCloudRepository(),
+      battles: const OfflineBattleRepository(),
+      push: const NoopPushService(),
+      pushRepo: null,
+    );
   }
 }
 
