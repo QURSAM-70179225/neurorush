@@ -35,10 +35,14 @@ describe('users', () => {
     await assertSucceeds(getDoc(doc(bob(), 'users/alice')));
     await assertFails(getDoc(doc(anon(), 'users/alice')));
   });
-  test('owner can edit cosmetic and streak fields', async () => {
-    await assertSucceeds(updateDoc(doc(alice(), 'users/alice'), { displayName: 'Ali', country: 'PK', currentStreak: 3, bestStreak: 5 }));
+  test('owner can edit cosmetic fields', async () => {
+    await assertSucceeds(updateDoc(doc(alice(), 'users/alice'), { displayName: 'Ali', country: 'PK' }));
   });
-  test('owner cannot touch XP, level or username', async () => {
+  test('owner cannot touch XP, level, username, streak, coins or entitlements', async () => {
+    await assertFails(updateDoc(doc(alice(), 'users/alice'), { currentStreak: 99 }));
+    await assertFails(updateDoc(doc(alice(), 'users/alice'), { freezes: 3 }));
+    await assertFails(updateDoc(doc(alice(), 'users/alice'), { coins: 100000 }));
+    await assertFails(updateDoc(doc(alice(), 'users/alice'), { 'entitlements.pro': true }));
     await assertFails(updateDoc(doc(alice(), 'users/alice'), { xp: 999999 }));
     await assertFails(updateDoc(doc(alice(), 'users/alice'), { level: 50 }));
     await assertFails(updateDoc(doc(alice(), 'users/alice'), { username: 'king' }));
@@ -46,7 +50,6 @@ describe('users', () => {
   test('field validation', async () => {
     await assertFails(updateDoc(doc(alice(), 'users/alice'), { country: 'Pakistan' }));
     await assertFails(updateDoc(doc(alice(), 'users/alice'), { displayName: 'x'.repeat(31) }));
-    await assertFails(updateDoc(doc(alice(), 'users/alice'), { currentStreak: 9, bestStreak: 5 }));
   });
   test('nobody can edit someone else', async () => {
     await assertFails(updateDoc(doc(bob(), 'users/alice'), { displayName: 'hacked' }));
@@ -96,7 +99,7 @@ describe('daily workouts', () => {
 
 describe('exact client operations (lib/data/repositories/firebase_cloud_repository.dart)', () => {
   test('profile publish (merge, serverTimestamp, null display name) on a new and existing doc', async () => {
-    const payload = { currentStreak: 3, bestStreak: 4, streakDay: '2026-11-08', country: 'PK', displayName: null, lastActiveAt: serverTimestamp() };
+    const payload = { country: 'PK', displayName: null, lastActiveAt: serverTimestamp() };
     await assertSucceeds(setDoc(doc(env.authenticatedContext('newbie').firestore(), 'users/newbie'), payload, { merge: true }));
     await assertSucceeds(setDoc(doc(alice(), 'users/alice'), payload, { merge: true }));
   });
@@ -164,5 +167,7 @@ describe('battles and push', () => {
     await assertFails(setDoc(doc(alice(), 'pushTargets/alice'), { ...ok, tokens: Array(11).fill('t') }));
     await assertFails(setDoc(doc(alice(), 'pushTargets/alice'), { ...ok, admin: true }));
     await assertFails(getDoc(doc(alice(), 'pushLog/x')));
+    await assertFails(getDoc(doc(alice(), 'rewardGrants/x')));
+    await assertFails(setDoc(doc(alice(), 'purchases/x'), { uid: 'alice', productId: 'remove_ads' }));
   });
 });

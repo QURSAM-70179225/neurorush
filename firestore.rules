@@ -16,12 +16,12 @@ service cloud.firestore {
 
     // ---- Public player profile -------------------------------------------
     // Readable by any signed-in player (friends, leaderboards).
-    // Owner may only edit cosmetic / streak fields.
+    // Owner may only edit cosmetic fields; streaks, freezes, coins and
+    // entitlements are server-managed.
     match /users/{uid} {
       allow read: if signedIn();
       allow create, update: if isOwner(uid)
-        && changedOnly(['displayName', 'country', 'photoUrl', 'currentStreak', 'bestStreak',
-                        'streakDay', 'lastActiveAt'])
+        && changedOnly(['displayName', 'country', 'photoUrl', 'lastActiveAt'])
         && validClientProfile(request.resource.data);
       allow delete: if false;
 
@@ -29,10 +29,6 @@ service cloud.firestore {
         return (!('displayName' in d) || d.displayName == null || (d.displayName is string && d.displayName.size() <= 30))
           && (!('country' in d) || d.country == null || (d.country is string && d.country.matches('^[A-Z]{2}$')))
           && (!('photoUrl' in d) || d.photoUrl == null || (d.photoUrl is string && d.photoUrl.size() <= 500))
-          && (!('currentStreak' in d) || (d.currentStreak is int && d.currentStreak >= 0 && d.currentStreak <= 5000))
-          && (!('bestStreak' in d) || (d.bestStreak is int && d.bestStreak >= 0 && d.bestStreak <= 5000
-                                       && d.bestStreak >= d.get('currentStreak', 0)))
-          && (!('streakDay' in d) || (d.streakDay is string && d.streakDay.matches('^\\d{4}-\\d{2}-\\d{2}$')))
           && (!('lastActiveAt' in d) || d.lastActiveAt is timestamp);
       }
 
@@ -105,7 +101,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Purchases are verified and recorded server-side (Phase 6).
+    // Rewarded-ad grants written by the AdMob SSV callback.
+    match /rewardGrants/{id} {
+      allow read, write: if false;
+    }
+
+    // Purchases are verified with Google Play and recorded server-side.
     match /purchases/{id} {
       allow read: if signedIn() && resource.data.uid == request.auth.uid;
       allow write: if false;

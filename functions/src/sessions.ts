@@ -4,9 +4,11 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { newlyUnlocked } from './achievements';
 import { db, paths, REGION } from './db';
 import { achievementStats, applySession, normalizeProfile } from './progress';
+import { levelFromXp } from './rewards';
 import { reserveDefaultUsername } from './usernames';
 import { InvalidInput, parseSession, validateSession } from './validation';
 import { isoWeekId } from './weeks';
+import { advanceStreak, localDayOf } from './economyRules';
 
 export interface SubmitResult {
   status: 'accepted' | 'duplicate' | 'rejected';
@@ -17,6 +19,9 @@ export interface SubmitResult {
   level?: number;
   brainScore?: number;
   newAchievements?: string[];
+  streak?: number;
+  freezesUsed?: number;
+  freezeEarned?: boolean;
 }
 
 /**
@@ -35,6 +40,9 @@ export const submitGameSession = onCall({ region: REGION }, async (req): Promise
     if (e instanceof InvalidInput) throw new HttpsError('invalid-argument', e.message);
     throw e;
   }
+
+  const tzRaw = req.data?.tzOffsetMinutes;
+  const tz = typeof tzRaw === 'number' && Number.isInteger(tzRaw) && Math.abs(tzRaw) <= 14 * 60 ? tzRaw : 0;
 
   const now = Date.now();
   const verdict = validateSession(s, now);
@@ -79,8 +87,26 @@ export const submitGameSession = onCall({ region: REGION }, async (req): Promise
     let username = userData.username as string | undefined;
     if (!username) username = await reserveDefaultUsername(tx, uid);
 
-    const { stars, xp, accuracy, profile } = applySession(normalizeProfile(userData), s);
-    const bestStreak = typeof userData.bestStreak === 'number' ? userData.bestStreak : 0;
+    const applied = applySession(normalizeProfile(userData), s);
+    const { stars, accuracy, profile } = applied;
+    // A rewarded "double XP" ad watched before this round was uploaded.
+    const boosted = (userData.pendingBoosts as Record<string, boolean> | undefined)?.[s.id] === true;
+    const xp = boosted ? applied.xp * 2 : applied.xp;
+    if (boosted) {
+      profile.xp += applied.xp;
+      profile.level = levelFromXp(profile.xp);
+    }
+    // Streaks and freezes are kept on the server (in the player's local days).
+    const streakResult = advanceStreak(
+      {
+        current: Number(userData.currentStreak ?? 0),
+        best: Number(userData.bestStreak ?? 0),
+        lastDay: (userData.streakDay as string | undefined) ?? null,
+      },
+      localDayOf(s.playedAt, tz),
+      Number(userData.freezes ?? 1),
+    );
+    const bestStreak = streakResult.streak.best;
     const unlockedBefore = Object.keys((achSnap.get('unlocked') as Record<string, unknown>) ?? {});
     const fresh = newlyUnlocked(achievementStats(profile, bestStreak), unlockedBefore);
 
@@ -95,6 +121,7 @@ export const submitGameSession = onCall({ region: REGION }, async (req): Promise
       accuracy,
       stars,
       xp,
+      boosted,
       weekId,
       createdAt: FieldValue.serverTimestamp(),
     });
@@ -103,6 +130,11 @@ export const submitGameSession = onCall({ region: REGION }, async (req): Promise
       {
         ...profile,
         username,
+        currentStreak: streakResult.streak.current,
+        bestStreak: streakResult.streak.best,
+        streakDay: streakResult.streak.lastDay,
+        freezes: streakResult.freezes,
+        ...(boosted ? { pendingBoosts: { [s.id]: FieldValue.delete() } } : {}),
         lastSessionAt: Timestamp.fromMillis(s.playedAt),
         createdAt: userData.createdAt ?? FieldValue.serverTimestamp(),
       },
@@ -138,6 +170,9 @@ export const submitGameSession = onCall({ region: REGION }, async (req): Promise
       level: profile.level,
       brainScore: profile.brainScore,
       newAchievements: fresh,
+      streak: streakResult.streak.current,
+      freezesUsed: streakResult.freezesUsed,
+      freezeEarned: streakResult.freezeEarned,
     };
   });
 });

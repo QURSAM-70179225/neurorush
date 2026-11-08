@@ -149,7 +149,7 @@ test('endless: free daily limit, Pro unlimited, generated puzzle when Groq is do
   const blocked = await call('getEndlessPuzzle', u.token, {});
   expect(blocked.error?.status).toBe('RESOURCE_EXHAUSTED');
 
-  await db.doc(`users/${u.uid}`).set({ entitlements: { pro: true } }, { merge: true });
+  await db.doc(`users/${u.uid}`).set({ entitlements: { pro: true, proExpiresAt: Timestamp.fromMillis(Date.now() + 86400_000) } }, { merge: true });
   mode = 'down';
   const pro = await call<{ source: string; remainingToday: number | null; choices: string[] }>('getEndlessPuzzle', u.token, {});
   expect(pro.result).toMatchObject({ source: 'generated', remainingToday: null });

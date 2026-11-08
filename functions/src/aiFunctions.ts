@@ -8,14 +8,14 @@ import { CoachInput, DaySession, fallbackCoachTip, generateCoachTip } from './ai
 import { GroqClient, LlmClient } from './ai/llm';
 import { CHOICES, generatedSequencePuzzle, generateVerifiedPuzzle, Puzzle, puzzleHash } from './ai/puzzles';
 import { db, REGION } from './db';
+import { proActive } from './economyRules';
+import { economy } from './config';
 
 /** Set with: firebase functions:secrets:set GROQ_API_KEY */
 export const GROQ_API_KEY = defineSecret('GROQ_API_KEY');
 export const GROQ_MODEL = defineString('GROQ_MODEL', { default: 'llama-3.3-70b-versatile' });
 export const GROQ_BASE_URL = defineString('GROQ_BASE_URL', { default: 'https://api.groq.com/openai/v1' });
 
-/** Free players get this many Endless puzzles per UTC day; Pro is unlimited. */
-export const FREE_ENDLESS_PER_DAY = 10;
 export const ENDLESS_LIVES = 3;
 /** Answers later than this after the puzzle was served count as wrong. */
 export const ENDLESS_ANSWER_WINDOW_MS = 60_000;
@@ -111,6 +111,8 @@ interface EndlessState {
   solved: number;
   activePuzzleId: string | null;
   recent: string[];
+  /** A rewarded ad already gave this run an extra life. */
+  revived: boolean;
 }
 
 function endlessState(raw: unknown, today: string): EndlessState {
@@ -124,6 +126,7 @@ function endlessState(raw: unknown, today: string): EndlessState {
     solved: e.solved ?? 0,
     activePuzzleId: e.activePuzzleId ?? null,
     recent: Array.isArray(e.recent) ? e.recent.slice(-50) : [],
+    revived: e.revived === true,
   };
 }
 
@@ -146,24 +149,26 @@ export const getEndlessPuzzle = onCall({ region: REGION, secrets: [GROQ_API_KEY]
   const today = new Date().toISOString().slice(0, 10);
   const userRef = db.doc(`users/${uid}`);
   const userSnap = await userRef.get();
-  const pro = userSnap.get('entitlements.pro') === true;
+  const pro = proActive(userSnap.get('entitlements'), Date.now());
   const state = endlessState(userSnap.get('endless'), today);
+  const freePerDay = (await economy()).free_endless_per_day;
 
   if (newRun || state.lives <= 0) {
     state.run = 0;
     state.lives = ENDLESS_LIVES;
+    state.revived = false;
   }
 
   if (state.activePuzzleId && !newRun) {
     const active = await db.doc(`endlessPuzzles/${state.activePuzzleId}`).get();
     if (active.exists && active.get('answered') === false) {
       await userRef.set({ endless: state }, { merge: true });
-      return { ...publicPuzzle(active.id, active.data() as Puzzle), run: state.run, lives: state.lives, bestRun: state.bestRun, remainingToday: pro ? null : FREE_ENDLESS_PER_DAY - state.used };
+      return { ...publicPuzzle(active.id, active.data() as Puzzle), run: state.run, lives: state.lives, bestRun: state.bestRun, remainingToday: pro ? null : freePerDay - state.used };
     }
   }
 
-  if (!pro && state.used >= FREE_ENDLESS_PER_DAY) {
-    throw new HttpsError('resource-exhausted', `You’ve used today’s ${FREE_ENDLESS_PER_DAY} free puzzles. NeuroRush Pro unlocks unlimited Endless Mode.`);
+  if (!pro && state.used >= freePerDay) {
+    throw new HttpsError('resource-exhausted', `You’ve used today’s ${freePerDay} free puzzles. NeuroRush Pro unlocks unlimited Endless Mode.`);
   }
 
   let puzzle: Puzzle | null = null;
@@ -180,7 +185,7 @@ export const getEndlessPuzzle = onCall({ region: REGION, secrets: [GROQ_API_KEY]
   state.activePuzzleId = id;
   state.recent = [...state.recent, puzzleHash(puzzle.question)].slice(-50);
   await userRef.set({ endless: state }, { merge: true });
-  return { ...publicPuzzle(id, puzzle), run: state.run, lives: state.lives, bestRun: state.bestRun, remainingToday: pro ? null : FREE_ENDLESS_PER_DAY - state.used };
+  return { ...publicPuzzle(id, puzzle), run: state.run, lives: state.lives, bestRun: state.bestRun, remainingToday: pro ? null : freePerDay - state.used };
 });
 
 /** Checks an Endless answer on the server and updates the run. answerIndex -1 = timed out. */
