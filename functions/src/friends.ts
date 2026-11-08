@@ -4,6 +4,7 @@ import { newlyUnlocked } from './achievements';
 import { db, paths, REGION } from './db';
 import { achievementStats, normalizeProfile } from './progress';
 import { normalizeUsername } from './usernames';
+import { sendPush } from './push';
 
 export const MAX_FRIENDS = 200;
 
@@ -54,7 +55,7 @@ export const sendFriendRequest = onCall({ region: REGION }, async (req) => {
   if (!target) throw new HttpsError('not-found', `No player called "${name}".`);
   if (target === uid) throw new HttpsError('invalid-argument', "That's you!");
 
-  return db.runTransaction(async (tx) => {
+  const result = await db.runTransaction(async (tx) => {
     const [already, reverse, me] = await Promise.all([
       tx.get(db.doc(paths.friend(uid, target))),
       tx.get(db.doc(paths.request(uid, target))),
@@ -73,8 +74,17 @@ export const sendFriendRequest = onCall({ region: REGION }, async (req) => {
       fromDisplayName: me.get('displayName') ?? null,
       createdAt: FieldValue.serverTimestamp(),
     });
-    return { status: 'requested' };
+    return { status: 'requested', fromName: (me.get('displayName') as string | undefined) ?? `@${myName}` };
   });
+  if (result.status === 'requested' && 'fromName' in result) {
+    await sendPush(target, 'friends', {
+      title: 'New friend request',
+      body: `${result.fromName} wants to be your NeuroRush friend.`,
+      data: { type: 'friend_request' },
+    }).catch(() => 0);
+    return { status: 'requested' };
+  }
+  return result;
 });
 
 export const respondFriendRequest = onCall({ region: REGION }, async (req) => {

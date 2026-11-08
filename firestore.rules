@@ -111,8 +111,43 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Live battles (Phase 5) — closed until implemented.
+    // Live battles: players watch the doc in real time; every change goes
+    // through Cloud Functions. Answers live in /secret and are never readable.
     match /battles/{id} {
+      allow read: if signedIn() && request.auth.uid in resource.data.players;
+      allow write: if false;
+      match /secret/{doc} {
+        allow read, write: if false;
+      }
+    }
+
+    // Matchmaking queue: a waiting player watches their own entry to learn
+    // the battle id once someone pairs with them.
+    match /matchQueue/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+
+    match /invites/{code} {
+      allow read, write: if false;
+    }
+
+    // Push settings and device tokens, written by the owner's app.
+    match /pushTargets/{uid} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['tokens', 'tzOffsetMinutes', 'reminderHourUtc', 'workoutHourUtc', 'prefs', 'updatedAt'])
+        && request.resource.data.tokens is list && request.resource.data.tokens.size() <= 10
+        && request.resource.data.tzOffsetMinutes is int
+        && request.resource.data.tzOffsetMinutes >= -840 && request.resource.data.tzOffsetMinutes <= 840
+        && request.resource.data.reminderHourUtc is int
+        && request.resource.data.reminderHourUtc >= 0 && request.resource.data.reminderHourUtc <= 23
+        && request.resource.data.workoutHourUtc is int
+        && request.resource.data.workoutHourUtc >= 0 && request.resource.data.workoutHourUtc <= 23
+        && request.resource.data.prefs is map;
+    }
+
+    match /pushLog/{id} {
       allow read, write: if false;
     }
 

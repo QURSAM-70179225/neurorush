@@ -134,3 +134,35 @@ describe('AI collections', () => {
     await assertFails(setDoc(doc(alice(), 'coachTips/alice_2026-11-09'), { uid: 'alice', tip: 'fake' }));
   });
 });
+
+describe('battles and push', () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'battles/b1'), { players: ['alice', 'bob'], scores: { alice: 0, bob: 0 } });
+      await setDoc(doc(db, 'battles/b1/secret/answers'), { answers: [1, 2, 3] });
+      await setDoc(doc(db, 'matchQueue/alice'), { uid: 'alice', battleId: null });
+    });
+  });
+  test('only the two players can watch a battle; nobody can write or read answers', async () => {
+    await assertSucceeds(getDoc(doc(alice(), 'battles/b1')));
+    await assertSucceeds(getDoc(doc(bob(), 'battles/b1')));
+    await assertFails(getDoc(doc(env.authenticatedContext('carol').firestore(), 'battles/b1')));
+    await assertFails(updateDoc(doc(alice(), 'battles/b1'), { 'scores.alice': 9999 }));
+    await assertFails(getDoc(doc(alice(), 'battles/b1/secret/answers')));
+  });
+  test('players watch only their own queue entry', async () => {
+    await assertSucceeds(getDoc(doc(alice(), 'matchQueue/alice')));
+    await assertFails(getDoc(doc(bob(), 'matchQueue/alice')));
+    await assertFails(setDoc(doc(alice(), 'matchQueue/alice'), { battleId: 'x' }));
+  });
+  test('push targets: owner writes validated settings', async () => {
+    const ok = { tokens: ['t1'], tzOffsetMinutes: 300, reminderHourUtc: 14, workoutHourUtc: 3, prefs: { streak: true }, updatedAt: serverTimestamp() };
+    await assertSucceeds(setDoc(doc(alice(), 'pushTargets/alice'), ok));
+    await assertFails(setDoc(doc(bob(), 'pushTargets/alice'), ok));
+    await assertFails(setDoc(doc(alice(), 'pushTargets/alice'), { ...ok, reminderHourUtc: 24 }));
+    await assertFails(setDoc(doc(alice(), 'pushTargets/alice'), { ...ok, tokens: Array(11).fill('t') }));
+    await assertFails(setDoc(doc(alice(), 'pushTargets/alice'), { ...ok, admin: true }));
+    await assertFails(getDoc(doc(alice(), 'pushLog/x')));
+  });
+});
