@@ -1,0 +1,29 @@
+{
+  "name": "neurorush-functions",
+  "private": true,
+  "main": "lib/index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "copy-shared": "node -e \"require('fs').mkdirSync('src/generated',{recursive:true});require('fs').copyFileSync('../shared/achievements.json','src/generated/achievements.json')\"",
+    "build": "npm run copy-shared && tsc",
+    "test": "npm run copy-shared && jest",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-neurorush \"jest --config jest.rules.config.js\"",
+    "deploy": "firebase deploy --only functions",
+    "test:emulators": "npm run build && firebase emulators:exec --only firestore,functions,auth --project demo-neurorush \"jest --config jest.emulator.config.js\""
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0",
+    "firebase-functions": "^7.4.0"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "@types/jest": "^29.5.14",
+    "firebase": "^13.2.0",
+    "firebase-tools": "^15.35.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.4.15",
+    "typescript": "^5.9.3"
+  }
+}

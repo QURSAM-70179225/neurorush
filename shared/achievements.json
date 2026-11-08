@@ -1,0 +1,275 @@
+{
+  "version": 1,
+  "achievements": [
+    {
+      "id": "first_round",
+      "title": "First Steps",
+      "description": "Finish your first round",
+      "metric": "rounds",
+      "op": ">=",
+      "target": 1,
+      "icon": "flag"
+    },
+    {
+      "id": "rounds_10",
+      "title": "Warming Up",
+      "description": "Finish 10 rounds",
+      "metric": "rounds",
+      "op": ">=",
+      "target": 10,
+      "icon": "directions_run"
+    },
+    {
+      "id": "rounds_50",
+      "title": "Dedicated Mind",
+      "description": "Finish 50 rounds",
+      "metric": "rounds",
+      "op": ">=",
+      "target": 50,
+      "icon": "fitness_center"
+    },
+    {
+      "id": "rounds_200",
+      "title": "Brain Athlete",
+      "description": "Finish 200 rounds",
+      "metric": "rounds",
+      "op": ">=",
+      "target": 200,
+      "icon": "sports_martial_arts"
+    },
+    {
+      "id": "rounds_500",
+      "title": "Unstoppable",
+      "description": "Finish 500 rounds",
+      "metric": "rounds",
+      "op": ">=",
+      "target": 500,
+      "icon": "all_inclusive"
+    },
+    {
+      "id": "xp_1000",
+      "title": "XP Hunter",
+      "description": "Earn 1,000 XP",
+      "metric": "xp",
+      "op": ">=",
+      "target": 1000,
+      "icon": "bolt"
+    },
+    {
+      "id": "xp_10000",
+      "title": "XP Legend",
+      "description": "Earn 10,000 XP",
+      "metric": "xp",
+      "op": ">=",
+      "target": 10000,
+      "icon": "electric_bolt"
+    },
+    {
+      "id": "level_5",
+      "title": "Rising Mind",
+      "description": "Reach level 5",
+      "metric": "level",
+      "op": ">=",
+      "target": 5,
+      "icon": "trending_up"
+    },
+    {
+      "id": "level_20",
+      "title": "Sharp Spark",
+      "description": "Reach level 20",
+      "metric": "level",
+      "op": ">=",
+      "target": 20,
+      "icon": "auto_awesome"
+    },
+    {
+      "id": "level_50",
+      "title": "Neuron Master",
+      "description": "Reach level 50",
+      "metric": "level",
+      "op": ">=",
+      "target": 50,
+      "icon": "workspace_premium"
+    },
+    {
+      "id": "streak_3",
+      "title": "On Fire",
+      "description": "Play 3 days in a row",
+      "metric": "bestStreak",
+      "op": ">=",
+      "target": 3,
+      "icon": "local_fire_department"
+    },
+    {
+      "id": "streak_7",
+      "title": "Week Warrior",
+      "description": "Play 7 days in a row",
+      "metric": "bestStreak",
+      "op": ">=",
+      "target": 7,
+      "icon": "whatshot"
+    },
+    {
+      "id": "streak_30",
+      "title": "Monthly Mind",
+      "description": "Play 30 days in a row",
+      "metric": "bestStreak",
+      "op": ">=",
+      "target": 30,
+      "icon": "calendar_month"
+    },
+    {
+      "id": "streak_100",
+      "title": "Centurion",
+      "description": "Play 100 days in a row",
+      "metric": "bestStreak",
+      "op": ">=",
+      "target": 100,
+      "icon": "military_tech"
+    },
+    {
+      "id": "stars3_1",
+      "title": "Three Stars",
+      "description": "Earn 3 stars in a round",
+      "metric": "threeStarRounds",
+      "op": ">=",
+      "target": 1,
+      "icon": "star"
+    },
+    {
+      "id": "stars3_25",
+      "title": "Star Collector",
+      "description": "Earn 3 stars in 25 rounds",
+      "metric": "threeStarRounds",
+      "op": ">=",
+      "target": 25,
+      "icon": "stars"
+    },
+    {
+      "id": "perfect_1",
+      "title": "Flawless",
+      "description": "Finish a round with 100% accuracy (10+ answers)",
+      "metric": "perfectRounds",
+      "op": ">=",
+      "target": 1,
+      "icon": "verified"
+    },
+    {
+      "id": "perfect_10",
+      "title": "Perfectionist",
+      "description": "10 flawless rounds",
+      "metric": "perfectRounds",
+      "op": ">=",
+      "target": 10,
+      "icon": "diamond"
+    },
+    {
+      "id": "combo_10",
+      "title": "Combo Starter",
+      "description": "Get 10 correct answers in a row",
+      "metric": "maxCombo",
+      "op": ">=",
+      "target": 10,
+      "icon": "timeline"
+    },
+    {
+      "id": "combo_25",
+      "title": "Combo King",
+      "description": "Get 25 correct answers in a row",
+      "metric": "maxCombo",
+      "op": ">=",
+      "target": 25,
+      "icon": "crown"
+    },
+    {
+      "id": "reflex_500",
+      "title": "Quick Draw",
+      "description": "React in under 500 ms",
+      "metric": "fastestReactionMs",
+      "op": "<",
+      "target": 500,
+      "icon": "speed"
+    },
+    {
+      "id": "reflex_300",
+      "title": "Lightning Reflexes",
+      "description": "React in under 300 ms",
+      "metric": "fastestReactionMs",
+      "op": "<",
+      "target": 300,
+      "icon": "flash_on"
+    },
+    {
+      "id": "explorer",
+      "title": "Explorer",
+      "description": "Play all 8 games",
+      "metric": "gamesTried",
+      "op": ">=",
+      "target": 8,
+      "icon": "explore"
+    },
+    {
+      "id": "brain_500",
+      "title": "Half-Way Brain",
+      "description": "Reach a Brain Score of 500",
+      "metric": "brainScore",
+      "op": ">=",
+      "target": 500,
+      "icon": "psychology"
+    },
+    {
+      "id": "brain_800",
+      "title": "Big Brain",
+      "description": "Reach a Brain Score of 800",
+      "metric": "brainScore",
+      "op": ">=",
+      "target": 800,
+      "icon": "psychology_alt"
+    },
+    {
+      "id": "max_level",
+      "title": "Max Difficulty",
+      "description": "Reach difficulty level 10 in any game",
+      "metric": "maxDifficulty",
+      "op": ">=",
+      "target": 10,
+      "icon": "terrain"
+    },
+    {
+      "id": "friend_1",
+      "title": "Social Thinker",
+      "description": "Add your first friend",
+      "metric": "friends",
+      "op": ">=",
+      "target": 1,
+      "icon": "group_add"
+    },
+    {
+      "id": "friend_10",
+      "title": "Brain Squad",
+      "description": "Have 10 friends",
+      "metric": "friends",
+      "op": ">=",
+      "target": 10,
+      "icon": "groups"
+    },
+    {
+      "id": "calculator",
+      "title": "Human Calculator",
+      "description": "Score 3,000 in Speed Math",
+      "metric": "best_speed_math",
+      "op": ">=",
+      "target": 3000,
+      "icon": "calculate"
+    },
+    {
+      "id": "photo_memory",
+      "title": "Photographic Memory",
+      "description": "Score 2,600 in Memory Grid",
+      "metric": "best_memory_grid",
+      "op": ">=",
+      "target": 2600,
+      "icon": "photo_camera"
+    }
+  ]
+}

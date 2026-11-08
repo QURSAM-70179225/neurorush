@@ -1,0 +1,112 @@
+rules_version = '2';
+
+// NeuroRush security rules.
+// Principle: clients may only write their own *non-competitive* data.
+// Scores, XP, levels, leaderboards, achievements and friendships are written
+// exclusively by Cloud Functions (Admin SDK bypasses these rules) after
+// server-side validation.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function changedOnly(fields) {
+      return request.resource.data.diff(resource == null ? {} : resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    // ---- Public player profile -------------------------------------------
+    // Readable by any signed-in player (friends, leaderboards).
+    // Owner may only edit cosmetic / streak fields.
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create, update: if isOwner(uid)
+        && changedOnly(['displayName', 'country', 'photoUrl', 'currentStreak', 'bestStreak',
+                        'streakDay', 'lastActiveAt'])
+        && validClientProfile(request.resource.data);
+      allow delete: if false;
+
+      function validClientProfile(d) {
+        return (!('displayName' in d) || (d.displayName is string && d.displayName.size() <= 30))
+          && (!('country' in d) || d.country == null || (d.country is string && d.country.matches('^[A-Z]{2}$')))
+          && (!('photoUrl' in d) || d.photoUrl == null || (d.photoUrl is string && d.photoUrl.size() <= 500))
+          && (!('currentStreak' in d) || (d.currentStreak is int && d.currentStreak >= 0 && d.currentStreak <= 5000))
+          && (!('bestStreak' in d) || (d.bestStreak is int && d.bestStreak >= 0 && d.bestStreak <= 5000
+                                       && d.bestStreak >= d.get('currentStreak', 0)))
+          && (!('streakDay' in d) || (d.streakDay is string && d.streakDay.matches('^\\d{4}-\\d{2}-\\d{2}$')))
+          && (!('lastActiveAt' in d) || d.lastActiveAt is timestamp);
+      }
+
+      // Private per-user data (progress items, settings). Owner only.
+      match /private/{doc} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    // Username → uid index; claimed via the claimUsername function.
+    match /usernames/{name} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // Validated rounds; written only by submitGameSession.
+    match /gameSessions/{id} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    // Daily workout completion, owner only.
+    match /dailyWorkouts/{uid}/days/{day} {
+      allow read: if isOwner(uid);
+      allow write: if isOwner(uid)
+        && day.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && request.resource.data.keys().hasOnly(['games', 'completed', 'updatedAt'])
+        && request.resource.data.games is list && request.resource.data.games.size() <= 3
+        && request.resource.data.completed is list && request.resource.data.completed.size() <= 3;
+    }
+
+    // Weekly boards; entries written only by submitGameSession.
+    match /leaderboards/{weekId} {
+      allow read: if signedIn();
+      allow write: if false;
+      match /entries/{uid} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+    }
+
+    // Friends and requests are managed by functions; owners can read and
+    // decline (delete) incoming requests.
+    match /friends/{uid} {
+      match /list/{friendUid} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+      match /requests/{fromUid} {
+        allow read: if isOwner(uid);
+        allow delete: if isOwner(uid);
+        allow create, update: if false;
+      }
+    }
+
+    // Unlocked badges: visible to other players, granted by functions only.
+    match /achievements/{uid} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // Purchases are verified and recorded server-side (Phase 6).
+    match /purchases/{id} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    // Live battles (Phase 5) — closed until implemented.
+    match /battles/{id} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
