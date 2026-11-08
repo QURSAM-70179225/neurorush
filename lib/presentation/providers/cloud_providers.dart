@@ -11,6 +11,7 @@ import '../../domain/logic/achievement_stats.dart';
 import '../../domain/logic/weeks.dart';
 import '../../domain/repositories/cloud_repository.dart';
 import 'app_providers.dart';
+import 'shop_providers.dart';
 
 /// Overridden in main() with Firebase when available.
 final cloudRepositoryProvider = Provider<CloudRepository>((ref) => const OfflineCloudRepository());
@@ -163,21 +164,16 @@ class SyncNotifier extends Notifier<SyncStatus> {
   }
 
   Future<void> _publishProfile(CloudRepository cloud, String uid) async {
-    final streak = ref.read(streakProvider);
-    final now = ref.read(clockProvider)();
+    // Streaks are computed by the server; the app only fills in profile basics.
     final profile = ref.read(cloudProfileProvider).value;
-    final lastActiveDay = streak.playedToday ? now : now.subtract(const Duration(days: 1));
-    final day = '${lastActiveDay.year.toString().padLeft(4, '0')}-'
-        '${lastActiveDay.month.toString().padLeft(2, '0')}-${lastActiveDay.day.toString().padLeft(2, '0')}';
-    final best = streak.best > (profile?.bestStreak ?? 0) ? streak.best : profile!.bestStreak;
-    await cloud.updateProfile(uid, {
-      'currentStreak': streak.current,
-      'bestStreak': best < streak.current ? streak.current : best,
-      'streakDay': day,
-      if (profile?.country == null) 'country': ref.read(myCountryProvider),
-      if (profile?.displayName == null && ref.read(currentUserProvider)?.displayName != null)
-        'displayName': ref.read(currentUserProvider)!.displayName,
-    });
+    final displayName = ref.read(currentUserProvider)?.displayName;
+    if (profile?.country == null || (profile?.displayName == null && displayName != null)) {
+      await cloud.updateProfile(uid, {
+        if (profile?.country == null) 'country': ref.read(myCountryProvider),
+        if (profile?.displayName == null && displayName != null) 'displayName': displayName,
+      });
+    }
+    await claimPendingRewards(ref);
     final w = ref.read(dailyWorkoutProvider);
     final wd = '${w.day.year.toString().padLeft(4, '0')}-${w.day.month.toString().padLeft(2, '0')}-${w.day.day.toString().padLeft(2, '0')}';
     await cloud.saveDailyWorkout(uid, wd, [for (final g in w.games) g.id], [for (final g in w.completed) g.id]);

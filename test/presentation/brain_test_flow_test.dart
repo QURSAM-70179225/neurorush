@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:neurorush/domain/entities/cloud_models.dart';
 import 'package:neurorush/domain/entities/game_type.dart';
+import 'package:neurorush/domain/entities/shop.dart';
 import 'package:neurorush/presentation/screens/brain/brain_screen.dart';
 import 'package:neurorush/presentation/screens/brain_test/brain_test_screen.dart';
 
@@ -47,6 +49,19 @@ void main() {
     expect(find.text('home page'), findsOneWidget);
   });
 
+  testWidgets('30-day trends are a Pro feature', (tester) async {
+    usePhoneSize(tester);
+    await tester.pumpWidget(ProviderScope(
+      overrides: testOverrides(history: MemoryHistoryRepository([sampleResult()]), cloud: FakeCloudRepository()),
+      child: const MaterialApp(home: BrainScreen()),
+    ));
+    await tester.pumpAndSettle();
+    await scrollTo(tester, find.text('30 days'));
+    await tester.tap(find.text('30 days'));
+    await tester.pumpAndSettle();
+    expect(find.text('30-day trends are part of NeuroRush Pro.'), findsOneWidget);
+  });
+
   testWidgets('Brain Score screen shows score, skills and 7/30 day charts', (tester) async {
     usePhoneSize(tester);
     final now = DateTime(2026, 3, 10, 12);
@@ -54,8 +69,10 @@ void main() {
       for (var i = 0; i < 5; i++)
         sampleResult(type: GameType.values[i], at: now.subtract(Duration(days: i)), id: 'r$i'),
     ]);
+    final pro = FakeCloudRepository()
+      ..profiles[testUid] = CloudProfile(uid: testUid, entitlements: Entitlements(pro: true, proExpiresAt: DateTime.now().add(const Duration(days: 9))));
     await tester.pumpWidget(ProviderScope(
-      overrides: testOverrides(history: history, clock: () => now),
+      overrides: testOverrides(history: history, clock: () => now, cloud: pro),
       child: const MaterialApp(home: BrainScreen()),
     ));
     await tester.pumpAndSettle();

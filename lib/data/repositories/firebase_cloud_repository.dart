@@ -7,6 +7,7 @@ import '../../domain/entities/ai_models.dart';
 import '../../domain/entities/cloud_models.dart';
 import '../../domain/entities/game_result.dart';
 import '../../domain/entities/game_type.dart';
+import '../../domain/entities/shop.dart';
 import '../../domain/entities/skill.dart';
 import '../../domain/repositories/cloud_repository.dart';
 
@@ -56,6 +57,19 @@ class FirebaseCloudRepository implements CloudRepository {
 
   static int _int(Object? v, [int fallback = 0]) => v is num ? v.toInt() : fallback;
 
+  static Entitlements _entitlements(Map<String, dynamic> d) {
+    final e = d['entitlements'] is Map ? Map<String, dynamic>.from(d['entitlements'] as Map) : const <String, dynamic>{};
+    final exp = e['proExpiresAt'];
+    return Entitlements(
+      removeAds: e['removeAds'] == true,
+      pro: e['pro'] == true,
+      proExpiresAt: exp is Timestamp ? exp.toDate() : (exp is num ? DateTime.fromMillisecondsSinceEpoch(exp.toInt()) : null),
+      themes: [for (final t in (e['themes'] as List? ?? const [])) '$t'],
+      coins: _int(d['coins']),
+      freezes: _int(d['freezes'], 1),
+    );
+  }
+
   static CloudProfile _profile(String uid, Map<String, dynamic> d) {
     final skills = d['skills'] is Map ? Map<String, dynamic>.from(d['skills'] as Map) : const <String, dynamic>{};
     final stats = d['stats'] is Map ? Map<String, dynamic>.from(d['stats'] as Map) : const <String, dynamic>{};
@@ -78,6 +92,7 @@ class FirebaseCloudRepository implements CloudRepository {
       battleWins: _int((d['battleStats'] as Map?)?['wins']),
       battleLosses: _int((d['battleStats'] as Map?)?['losses']),
       battleDraws: _int((d['battleStats'] as Map?)?['draws']),
+      entitlements: _entitlements(d),
       lastActiveAt: (d['lastActiveAt'] as Timestamp?)?.toDate(),
     );
   }
@@ -86,7 +101,11 @@ class FirebaseCloudRepository implements CloudRepository {
 
   @override
   Future<SubmitOutcome> submitSession(GameResult result) async {
-    final r = await _call('submitGameSession', {'session': result.toSubmitPayload()});
+    final r = await _call('submitGameSession', {
+      'session': result.toSubmitPayload(),
+      // Streaks are counted in the player's local days.
+      'tzOffsetMinutes': result.playedAt.timeZoneOffset.inMinutes,
+    });
     final status = SubmitStatus.values.firstWhere((s) => s.name == r['status'], orElse: () => SubmitStatus.rejected);
     return SubmitOutcome(
       status: status,
@@ -327,4 +346,34 @@ class FirebaseCloudRepository implements CloudRepository {
       timedOut: r['timedOut'] == true,
     );
   }
+
+  // --- shop & account --------------------------------------------------------
+
+  @override
+  Future<Entitlements> verifyPurchase(String productId, String purchaseToken) async {
+    final r = await _call('verifyPurchase', {'productId': productId, 'purchaseToken': purchaseToken});
+    final exp = r['proExpiresAt'];
+    return Entitlements(
+      removeAds: r['removeAds'] == true,
+      pro: r['pro'] == true,
+      proExpiresAt: exp is num ? DateTime.fromMillisecondsSinceEpoch(exp.toInt()) : null,
+      themes: [for (final t in (r['themes'] as List? ?? const [])) '$t'],
+      coins: _int(r['coins']),
+    );
+  }
+
+  @override
+  Future<CoinSpend> spendCoins(String item) async {
+    final r = await _call('spendCoins', {'item': item});
+    return CoinSpend(coins: _int(r['coins']), freezes: _int(r['freezes']));
+  }
+
+  @override
+  Future<RewardClaim> claimAdReward(String nonce) async {
+    final r = await _call('claimAdReward', {'nonce': nonce});
+    return RewardClaim(applied: r['applied'] == true, reason: r['reason'] as String?);
+  }
+
+  @override
+  Future<void> deleteAccount() => _call('deleteAccount', {'confirm': 'DELETE'});
 }

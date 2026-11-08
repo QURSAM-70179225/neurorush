@@ -23,6 +23,7 @@ class GameResult {
     this.syncState = SyncState.pending,
     this.ownerUid,
     this.rejectReason,
+    this.xpBoosted = false,
   });
 
   final String id;
@@ -51,6 +52,9 @@ class GameResult {
   /// Why the server refused the round (anti-cheat), if it did.
   final String? rejectReason;
 
+  /// XP was doubled by a rewarded ad.
+  final bool xpBoosted;
+
   bool get synced => syncState == SyncState.synced;
 
   int get attempts => correct + wrong;
@@ -65,6 +69,8 @@ class GameResult {
     SyncState? syncState,
     String? ownerUid,
     String? rejectReason,
+    int? xp,
+    bool? xpBoosted,
   }) =>
       GameResult(
         id: id,
@@ -77,13 +83,14 @@ class GameResult {
         avgReactionMs: avgReactionMs,
         bestReactionMs: bestReactionMs,
         stars: stars,
-        xp: xp,
+        xp: xp ?? this.xp,
         playedAt: playedAt,
         durationSeconds: durationSeconds,
         isPersonalBest: isPersonalBest ?? this.isPersonalBest,
         syncState: syncState ?? this.syncState,
         ownerUid: ownerUid ?? this.ownerUid,
         rejectReason: rejectReason ?? this.rejectReason,
+        xpBoosted: xpBoosted ?? this.xpBoosted,
       );
 
   Map<String, dynamic> toMap() => {
@@ -104,6 +111,7 @@ class GameResult {
         'syncState': syncState.name,
         'ownerUid': ownerUid,
         'rejectReason': rejectReason,
+        'xpBoosted': xpBoosted,
       };
 
   /// Payload for the submitGameSession Cloud Function.
@@ -148,6 +156,7 @@ class GameResult {
         ),
         ownerUid: map['ownerUid'] as String?,
         rejectReason: map['rejectReason'] as String?,
+        xpBoosted: map['xpBoosted'] as bool? ?? false,
       );
     } catch (_) {
       return null;

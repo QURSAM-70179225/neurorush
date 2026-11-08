@@ -1,6 +1,6 @@
 # Setup guide
 
-Covers Phases 1–5: Authentication, Firestore, Cloud Functions, Groq AI, battles and push notifications. Later phases add AdMob, Billing and release signing.
+Covers Phases 1–6: Authentication, Firestore, Cloud Functions, Groq AI, battles, push notifications, AdMob, Google Play Billing, Remote Config, App Check, privacy and account deletion. Phase 7 adds release signing and the store listing.
 
 ## 1. Tools
 - Flutter stable (built and tested with 3.47.9 / Dart 3.13)
@@ -111,6 +111,82 @@ How a battle works:
 
 Pushes go to Firebase Installation IDs (the current FCM API). Devices the server can no longer reach are removed from the list automatically.
 
+## 5d. Money, privacy and hardening (Phase 6)
+
+### AdMob
+1. In AdMob, create the app (Android, package `com.neurorush.app`) and two ad units: **Interstitial** and **Rewarded**.
+2. **App ID:** put it in `android/gradle.properties`:
+   ```
+   admobAppId=ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY
+   ```
+   Without it, Google's test app ID is used.
+3. **Ad unit IDs:** pass them at build time (step 7). Without them, Google's test units are used.
+4. **Rewarded ad → Server-side verification:** set the callback URL to
+   `https://asia-south1-<your-project-id>.cloudfunctions.net/admobSsv`.
+   Rewards are granted only after AdMob calls this URL with a valid signature.
+5. **Privacy & messaging:** create a **GDPR** message (and **US states** if needed). The app shows Google's consent form (UMP) before loading ads where it's required. Players can change their choice in Settings → Ad privacy choices.
+
+### Google Play Billing
+1. In Play Console → **Monetize → Products**, create:
+
+   | Product id | Type | Grants |
+   |---|---|---|
+   | `remove_ads` | In-app (one-time) | no interstitial ads |
+   | `premium_themes` | In-app (one-time) | all 3 neon themes |
+   | `coins_small` / `coins_medium` / `coins_large` | In-app (consumable) | 500 / 1,200 / 3,000 coins (Remote Config) |
+   | `neurorush_pro` | Subscription, base plan `monthly` (auto-renewing) | no ads, unlimited Endless Mode, all themes, 30-day stats |
+
+2. **Users and permissions:** invite the Functions service account (`<project-id>@appspot.gserviceaccount.com`, or the default compute account shown in Cloud Console → IAM). Give it **View financial data** and **Manage orders and subscriptions**. `verifyPurchase` uses it to call the Google Play Developer API.
+3. **Real-time developer notifications:**
+   - Create the Pub/Sub topic `play-billing` in the Firebase project's Google Cloud console.
+   - Grant `google-play-developer-notifications@system.gserviceaccount.com` the **Pub/Sub Publisher** role on it.
+   - In Play Console → Monetization setup, enter `projects/<project-id>/topics/play-billing`.
+   - Renewals, cancellations and refunds then update entitlements automatically (`playBillingNotifications`), and `recheckSubscriptions` runs daily as a safety net.
+4. **Testing:** add license testers in Play Console and upload an internal-testing build (step 7). Purchases only work in a build installed from Play.
+
+How a purchase flows:
+- The app attaches the obfuscated account ID `sha256("neurorush:"+uid)`.
+- `verifyPurchase` checks the purchase with Google and records it once in `purchases/{sha256(token)}`, then grants it.
+- It acknowledges or consumes the purchase only after granting, so a failure never loses a paid item. The app finishes the purchase with Play only after the server confirms.
+- A purchase verified while offline is re-delivered by Play at the next start.
+
+### Remote Config
+Create these keys in **two** templates: **Client** (app display and ad frequency) and **Server** (Firebase console → Remote Config → Server). The server template's prices are the ones actually charged.
+
+| Key | Default | Template | Meaning |
+|---|---|---|---|
+| `interstitial_every_n_games` | 3 | client | at most one interstitial per N finished rounds |
+| `interstitial_min_interval_seconds` | 120 | client | minimum time between interstitials |
+| `ads_enabled` | true | client | kill switch for interstitials |
+| `theme_price_coins` | 300 | client + server | price of one neon theme |
+| `freeze_price_coins` | 100 | client + server | price of one streak freeze |
+| `free_endless_per_day` | 10 | client + server | free Endless puzzles per day |
+| `coins_small_amount` / `coins_medium_amount` / `coins_large_amount` | 500 / 1200 / 3000 | server | coins per pack |
+| `rewarded_daily_limit` | 10 | server | rewarded-ad grants per player per day |
+
+### Streaks and freezes (server-side)
+- **Streaks:** `submitGameSession` counts the streak in the player's local days (the app sends its time-zone offset).
+- **Freezes:** it uses freezes for missed days and awards one every 7 days (max 3). Freezes can also be bought with coins or earned from a rewarded ad.
+- **Client writes blocked:** `firestore.rules` no longer lets the app write its own streak, freezes, coins or entitlements.
+
+### App Check (Play Integrity)
+1. Firebase console → App Check → register the Android app with **Play Integrity**, using the SHA-256 of your *Play app signing* key.
+2. While developing, debug builds use the debug provider. Copy the debug token from logcat and add it under App Check → Manage debug tokens.
+3. Turn on enforcement for the Cloud Functions by putting this in `functions/.env.<project-id>`, then redeploying the functions:
+   ```
+   ENFORCE_APP_CHECK=true
+   ```
+   Once on, calls that don't come from your genuine app are rejected.
+
+### Privacy policy and account deletion (required by Google Play)
+- In the app: Settings → Privacy policy, and Profile → **Delete account**. Deletion calls `deleteAccount`, which removes the profile, rounds, friends, leaderboard entries, achievements, Endless and coach data, push registrations and the sign-in account. Purchase records stay for legal reasons but are unlinked from the account.
+- On the web: build and host the two pages Play asks for:
+  ```bash
+  tool/build_legal_pages.sh support@yourdomain.com
+  firebase deploy --only hosting
+  ```
+  In Play Console → App content, enter `https://<project-id>.web.app/privacy` and `https://<project-id>.web.app/delete-account`.
+
 ### Firestore schema
 
 | Path | Written by | Fields |
@@ -128,7 +204,9 @@ Pushes go to Firebase Installation IDs (the current FCM API). Devices the server
 | `coachTips/{uid}_{day}` | server | `uid, day, tip, funFact, focusSkill, source (ai/fallback), attempts, createdAt` |
 | `endlessPuzzles/{id}` | server (never client-readable) | `uid, kind, question, choices[4], answerIndex, explanation, difficulty, source, answered, correct, givenIndex, createdAt, answeredAt` |
 | `users/{uid}.endless` | server | `day, used, run, lives, bestRun, solved, activePuzzleId, recent[hash…50]` |
-| `purchases/{id}` | server (Phase 6) | — |
+| `purchases/{sha256(token)}` | server only | `uid, productId, kind, orderId, purchaseToken, coins, expiresAt, consumed, voided, createdAt` |
+| `rewardGrants/{sha256(transactionId)}` | server only (AdMob SSV) | `uid, reward, nonce, sessionId, claimed, result, verifiedAt, claimedAt` |
+| `users/{uid}` (server, Phase 6) | | `coins, freezes, currentStreak, bestStreak, streakDay, entitlements{removeAds, pro, proExpiresAt, themes[]}, adRewards{day,count}, pendingBoosts{sessionId}` |
 | `battles/{id}` | server; readable by its 2 players | `mode (random/invite/bot), status (waiting/active/finished/expired), players[2], playerInfo{uid:{username,displayName,trophies,level}}, questions[8] (no answers), count, questionMs, startAt, endsAt, scores{uid}, answers{uid:{i:{correct,points,ms}}}, winner, trophyDelta{uid}, inviteCode, host, createdAt, finishedAt` |
 | `battles/{id}/secret/answers` | server only | `answers[8]`, `bot[8]{correct,ms}` |
 | `matchQueue/{uid}` | server; owner reads | `uid, info, battleId, createdAt` |
@@ -162,6 +240,6 @@ flutter run --dart-define=USE_EMULATORS=true --dart-define=EMULATOR_HOST=192.168
 cd functions
 npm test                 # unit tests: validation, rewards, achievements, weeks
 npm run test:rules       # security rules on the Firestore emulator (needs Java 11+)
-npm run test:emulators   # end-to-end on Auth + Firestore + Functions emulators: scores, friends, AI (mock Groq), battles, push (dry-run log)
+npm run test:emulators   # end-to-end on Auth/Firestore/Functions/Pub/Sub emulators: scores, friends, AI (mock Groq), battles, push, purchases (mock Play API), rewarded ads (signed SSV), deletion
 npm run smoke:groq       # live AI prompts against Groq (needs GROQ_API_KEY)
 ```

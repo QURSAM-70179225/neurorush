@@ -23,7 +23,9 @@ import '../../presentation/screens/leaderboard/leaderboard_screen.dart';
 import '../../presentation/screens/onboarding/onboarding_screen.dart';
 import '../../presentation/screens/profile/profile_screen.dart';
 import '../../presentation/screens/results/results_screen.dart';
+import '../../presentation/screens/privacy/privacy_screen.dart';
 import '../../presentation/screens/settings/settings_screen.dart';
+import '../../presentation/screens/shop/shop_screen.dart';
 import '../../presentation/screens/shell/main_shell.dart';
 
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -42,6 +44,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final loc = state.matchedLocation;
       final onboarded = ref.read(settingsProvider).onboardingDone;
       final user = ref.read(currentUserProvider);
+      if (loc == '/privacy') return null; // readable before signing in
       if (!onboarded) return loc == '/onboarding' ? null : '/onboarding';
       if (user == null) return loc == '/auth' ? null : '/auth';
       // Offer the Brain Test once, right after the first sign-in.
@@ -55,6 +58,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/auth', builder: (_, _) => const AuthScreen()),
       GoRoute(path: '/upgrade', builder: (_, _) => const AuthScreen(upgrade: true)),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
+      GoRoute(path: '/shop', builder: (_, _) => const ShopScreen()),
+      GoRoute(path: '/privacy', builder: (_, _) => const PrivacyScreen()),
       GoRoute(path: '/brain', builder: (_, _) => const BrainScreen()),
       GoRoute(path: '/friends', builder: (_, _) => const FriendsScreen()),
       GoRoute(path: '/endless', builder: (_, _) => const EndlessScreen()),

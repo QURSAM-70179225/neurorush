@@ -177,6 +177,8 @@ class ProgressNotifier extends Notifier<ProgressState> {
   /// Spends freezes to cover missed days and awards milestone freezes.
   /// Call on app start/resume and after each round.
   Future<StreakUpdate> refresh() async {
+    // Online, the server applies and awards freezes (see submitGameSession).
+    if (ref.read(cloudRepositoryProvider).isAvailable) return const StreakUpdate();
     final now = ref.read(clockProvider)();
     final played = _playedDays();
     var s = state;
@@ -224,7 +226,8 @@ class ProgressNotifier extends Notifier<ProgressState> {
 
 final progressProvider = NotifierProvider<ProgressNotifier, ProgressState>(ProgressNotifier.new);
 
-final streakProvider = Provider<StreakStatus>((ref) {
+/// Streak computed from this device's rounds only (works offline).
+final localStreakProvider = Provider<StreakStatus>((ref) {
   final history = ref.watch(gameHistoryProvider);
   final progress = ref.watch(progressProvider);
   return StreakLogic.compute(
@@ -241,3 +244,28 @@ final brainScoreProvider = Provider<BrainScore>((ref) => BrainScore.fromHistory(
 final dailyWorkoutProvider = Provider<DailyWorkout>(
   (ref) => DailyWorkout.build(history: ref.watch(gameHistoryProvider), now: ref.watch(clockProvider)()),
 );
+
+/// Streak shown to the player: the server's (which applies freezes and counts
+/// every device) merged with rounds on this device that are not uploaded yet.
+final streakProvider = Provider<StreakStatus>((ref) {
+  final local = ref.watch(localStreakProvider);
+  final cloud = ref.watch(cloudRepositoryProvider);
+  final p = ref.watch(cloudProfileProvider).value;
+  if (!cloud.isAvailable || p == null) return local;
+  final now = ref.watch(clockProvider)();
+  final today = '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  final server = p.visibleStreak(now);
+  return StreakStatus(
+    current: server > local.current ? server : local.current,
+    best: [p.bestStreak, local.best, server, local.current].reduce((a, b) => a > b ? a : b),
+    playedToday: local.playedToday || p.streakDay == today,
+  );
+});
+
+/// Streak freezes: server-held when online, device-held in offline mode.
+final freezesProvider = Provider<int>((ref) {
+  final cloud = ref.watch(cloudRepositoryProvider);
+  final p = ref.watch(cloudProfileProvider).value;
+  if (cloud.isAvailable && p != null) return p.entitlements.freezes;
+  return ref.watch(progressProvider).freezes;
+});

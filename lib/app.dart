@@ -5,6 +5,7 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'domain/entities/app_settings.dart';
 import 'presentation/providers/app_providers.dart';
+import 'presentation/providers/shop_providers.dart';
 import 'presentation/widgets/push_listener.dart';
 
 class NeuroRushApp extends ConsumerWidget {
@@ -14,15 +15,20 @@ class NeuroRushApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
     final router = ref.watch(routerProvider);
+    final mode = settings.themeMode;
+    // A premium theme is only used while the player owns it (e.g. after a refund it falls back to dark).
+    final premium = mode.premiumId;
+    final owned = premium == null || ref.watch(entitlementsProvider).ownsTheme(premium, DateTime.now());
+    final neon = premium != null && owned;
     return MaterialApp.router(
       title: 'NeuroRush',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
-      themeMode: switch (settings.themeMode) {
+      theme: neon ? AppTheme.neon(mode) : AppTheme.light(),
+      darkTheme: neon ? AppTheme.neon(mode) : AppTheme.dark(),
+      themeMode: switch (mode) {
         AppThemeMode.system => ThemeMode.system,
         AppThemeMode.light => ThemeMode.light,
-        AppThemeMode.dark => ThemeMode.dark,
+        _ => ThemeMode.dark,
       },
       routerConfig: router,
       scaffoldMessengerKey: scaffoldMessengerKey,

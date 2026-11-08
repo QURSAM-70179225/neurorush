@@ -9,6 +9,7 @@ import '../../../domain/entities/game_result.dart';
 import '../../../domain/entities/game_type.dart';
 import '../../../domain/logic/brain_score.dart';
 import '../../providers/app_providers.dart';
+import '../../providers/cloud_providers.dart';
 import '../../widgets/brain_widgets.dart';
 import '../../widgets/coach_card.dart';
 import '../../widgets/common.dart';
@@ -49,7 +50,7 @@ class HomeScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
-                StreakFlame(status: streak, freezes: progress.freezes, onTap: () => _showStreakInfo(context, ref)),
+                StreakFlame(status: streak, freezes: ref.watch(freezesProvider), onTap: () => _showStreakInfo(context, ref)),
               ],
             ),
             if (streak.atRisk)
@@ -98,7 +99,7 @@ class HomeScreen extends ConsumerWidget {
 
   void _showStreakInfo(BuildContext context, WidgetRef ref) {
     final streak = ref.read(streakProvider);
-    final freezes = ref.read(progressProvider).freezes;
+    final freezes = ref.read(freezesProvider);
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -115,8 +116,17 @@ class HomeScreen extends ConsumerWidget {
               leading: const Icon(Icons.ac_unit_rounded, color: AppPalette.cyan),
               title: Text('$freezes streak freeze${freezes == 1 ? '' : 's'}'),
               subtitle: const Text(
-                  'A freeze is used automatically if you miss a day. Earn one every 7-day streak (max 2).'),
+                  'A freeze is used automatically if you miss a day. Earn one every 7-day streak, buy one with coins or watch an ad (max 3).'),
             ),
+            if (ref.read(cloudRepositoryProvider).isAvailable)
+              FilledButton.tonalIcon(
+                onPressed: () {
+                  Navigator.pop(c);
+                  context.push('/shop');
+                },
+                icon: const Icon(Icons.ac_unit_rounded),
+                label: const Text('Get streak freezes'),
+              ),
           ],
         ),
       ),

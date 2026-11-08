@@ -1,25 +1,62 @@
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_palette.dart';
 import '../../../domain/entities/game_result.dart';
 import '../../../domain/logic/xp_levels.dart';
+import '../../../domain/entities/shop.dart';
 import '../../game/results_args.dart';
+import '../../providers/app_providers.dart';
+import '../../providers/cloud_providers.dart';
+import '../../providers/shop_providers.dart';
+import '../../widgets/cloud_widgets.dart';
 import '../../widgets/achievement_icons.dart';
 import '../../widgets/common.dart';
 
-class ResultsScreen extends StatefulWidget {
+class ResultsScreen extends ConsumerStatefulWidget {
   ResultsScreen({super.key, required this.args}) : result = args.result;
   final ResultsArgs args;
   final GameResult result;
 
   @override
-  State<ResultsScreen> createState() => _ResultsScreenState();
+  ConsumerState<ResultsScreen> createState() => _ResultsScreenState();
 }
 
-class _ResultsScreenState extends State<ResultsScreen> {
+class _ResultsScreenState extends ConsumerState<ResultsScreen> {
+  late GameResult _result = widget.result;
+  bool _boosting = false;
+
+  /// Interstitials only ever appear here, between rounds.
+  Future<void> _leave(VoidCallback go) async {
+    await maybeShowInterstitial(ref);
+    if (mounted) go();
+  }
+
+  Future<void> _doubleXp() async {
+    setState(() => _boosting = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final claim = await watchRewardedAd(ref, RewardType.doubleXp, sessionId: _result.id);
+      if (claim == null) {
+        messenger.showSnackBar(const SnackBar(content: Text('Watch the whole ad to double your XP.')));
+      } else if (claim.applied || claim.reason == 'pending') {
+        final boosted = _result.copyWith(xp: _result.xp * 2, xpBoosted: true);
+        await ref.read(gameHistoryProvider.notifier).replace(boosted);
+        setState(() => _result = boosted);
+        messenger.showSnackBar(SnackBar(content: Text('XP doubled: +${boosted.xp} XP!')));
+      } else {
+        messenger.showSnackBar(SnackBar(content: Text(claim.reason == 'daily_limit' ? 'Daily reward limit reached.' : 'This round can’t be doubled.')));
+      }
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(cloudErrorText(e))));
+    } finally {
+      if (mounted) setState(() => _boosting = false);
+    }
+  }
+
   late final ConfettiController _confetti =
       ConfettiController(duration: const Duration(milliseconds: 1600));
 
@@ -56,7 +93,9 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final r = widget.result;
+    // Keep entitlements loaded so the interstitial check never sees stale data.
+    ref.watch(entitlementsProvider);
+    final r = _result;
     final theme = Theme.of(context);
     final gradient = AppPalette.gameGradient(r.gameType);
     return Scaffold(
@@ -174,19 +213,27 @@ class _ResultsScreenState extends State<ResultsScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
+                if (widget.args.justPlayed && !r.xpBoosted && ref.watch(cloudRepositoryProvider).isAvailable) ...[
+                  OutlinedButton.icon(
+                    onPressed: _boosting ? null : _doubleXp,
+                    icon: const Icon(Icons.ondemand_video_rounded),
+                    label: Text('Watch an ad: double to +${r.xp * 2} XP'),
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 FilledButton.icon(
-                  onPressed: () => context.pushReplacement('/play/${r.gameType.id}'),
+                  onPressed: () => _leave(() => context.pushReplacement('/play/${r.gameType.id}')),
                   icon: const Icon(Icons.replay_rounded),
                   label: const Text('Play again'),
                 ),
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
-                  onPressed: () => context.pushReplacement('/play/${r.gameType.next.id}'),
+                  onPressed: () => _leave(() => context.pushReplacement('/play/${r.gameType.next.id}')),
                   icon: const Icon(Icons.skip_next_rounded),
                   label: Text('Next game: ${r.gameType.next.title}'),
                 ),
                 const SizedBox(height: 10),
-                TextButton(onPressed: () => context.go('/home'), child: const Text('Back to home')),
+                TextButton(onPressed: () => _leave(() => context.go('/home')), child: const Text('Back to home')),
               ],
             ),
           ),

@@ -2,7 +2,7 @@
 
 Fast, adaptive brain-training mini-games for Android (Flutter + Riverpod + Hive + Firebase).
 
-## Status: Phase 5 complete
+## Status: Phase 6 complete
 | Phase | Scope | State |
 |---|---|---|
 | 1 | Setup, auth (Google / email / guest + upgrade), navigation, 3 mini-games, local scoring | ✅ |
@@ -10,8 +10,8 @@ Fast, adaptive brain-training mini-games for Android (Flutter + Riverpod + Hive 
 | 3 | Offline-first cloud sync, server-validated scores, weekly leaderboards (global / country / friends), friends, 30 achievements | ✅ |
 | 4 | AI Brain Coach after the daily workout, Endless Mode with AI-generated, independently verified puzzles (Groq via Cloud Functions only) | ✅ |
 | 5 | Live 1v1 battles (quick match, invite codes, friend challenges, practice bot; server-refereed), push notifications (streak, workout, friend beat your score, requests, challenges) | ✅ |
-| 6 | Ads, IAP, subscription, account deletion, hardening | next |
-| 7 | Polish, release build, store listing | planned |
+| 6 | AdMob (consent, capped interstitials, server-verified rewarded ads), Play Billing (Remove Ads, coins, themes, Pro subscription; server verification, RTDN), coin shop, neon themes, Remote Config, server-side streaks, App Check, privacy policy, account deletion | ✅ |
+| 7 | Analytics/Crashlytics, polish, release build, Play Store assets | next |
 
 ### Online architecture (Phase 3)
 - **Single source of truth:** the server is the only writer of competitive data (XP, scores, leaderboards, badges, friendships). The client calls Cloud Functions, and `firestore.rules` blocks direct writes.

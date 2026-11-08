@@ -9,6 +9,8 @@ import '../../../domain/entities/countries.dart';
 import '../../providers/cloud_providers.dart';
 import '../../widgets/brain_widgets.dart';
 import '../../widgets/cloud_widgets.dart';
+import '../../widgets/text_prompt_dialog.dart';
+import '../../providers/shop_providers.dart';
 import '../../widgets/common.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -32,6 +34,29 @@ class ProfileScreen extends ConsumerWidget {
       ),
     );
     if (ok == true) await repo.signOut();
+  }
+
+  Future<void> _deleteAccount(BuildContext context, WidgetRef ref, UserProfile user) async {
+    final confirm = await showTextPrompt(
+      context,
+      title: 'Delete your account?',
+      confirmLabel: 'Delete forever',
+      label: 'Type DELETE to confirm',
+      helperText: 'This permanently removes your profile, scores, streaks, friends and coins. It cannot be undone.',
+      validator: (v) => v == 'DELETE' ? null : 'Type DELETE in capitals',
+    );
+    if (confirm != 'DELETE' || !context.mounted) return;
+    final cloud = ref.read(cloudRepositoryProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      if (cloud.isAvailable) await cloud.deleteAccount();
+      await ref.read(gameHistoryProvider.notifier).clear();
+      await ref.read(progressProvider.notifier).reset();
+      await ref.read(authRepositoryProvider).signOut();
+      messenger.showSnackBar(const SnackBar(content: Text('Your account and data were deleted.')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(cloudErrorText(e))));
+    }
   }
 
   Future<void> _editProfile(BuildContext context, WidgetRef ref) async {
@@ -66,7 +91,6 @@ class ProfileScreen extends ConsumerWidget {
     final cloud = ref.watch(authRepositoryProvider).supportsCloudAccounts;
     final level = ref.watch(levelProvider);
     final streak = ref.watch(streakProvider);
-    final freezes = ref.watch(progressProvider).freezes;
     final brain = ref.watch(brainScoreProvider);
     final cloudProfile = ref.watch(cloudProfileProvider).value;
     final badges = ref.watch(unlockedAchievementsProvider).length;
@@ -176,6 +200,14 @@ class ProfileScreen extends ConsumerWidget {
                   onTap: () => context.push('/friends'),
                 ),
                 const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.storefront_rounded, color: AppPalette.pink),
+                  title: const Text('Shop'),
+                  subtitle: Text(cloud ? '${ref.watch(entitlementsProvider).coins} coins · Pro, themes, freezes' : 'Needs an online account'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => context.push('/shop'),
+                ),
+                const Divider(height: 1),
                 const _SyncTile(),
               ],
             ),
@@ -188,7 +220,7 @@ class ProfileScreen extends ConsumerWidget {
               value: '${streak.current}',
               color: AppPalette.flame,
             ),
-            StatTile(icon: Icons.ac_unit_rounded, label: 'Streak freezes', value: '$freezes', color: AppPalette.cyan),
+            StatTile(icon: Icons.ac_unit_rounded, label: 'Streak freezes', value: '${ref.watch(freezesProvider)}', color: AppPalette.cyan),
           ]),
           SectionHeader('Brain Score: ${brain.total}',
               trailing: TextButton(onPressed: () => context.push('/brain'), child: const Text('Details'))),
@@ -227,6 +259,12 @@ class ProfileScreen extends ConsumerWidget {
                   leading: const Icon(Icons.logout_rounded),
                   title: const Text('Sign out'),
                   onTap: () => _signOut(context, ref, user),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Icon(Icons.delete_forever_rounded, color: theme.colorScheme.error),
+                  title: Text('Delete account', style: TextStyle(color: theme.colorScheme.error)),
+                  onTap: () => _deleteAccount(context, ref, user),
                 ),
               ],
             ),

@@ -9,6 +9,8 @@ import '../../../domain/entities/ai_models.dart';
 import '../../../domain/repositories/cloud_repository.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/cloud_providers.dart';
+import '../../providers/shop_providers.dart';
+import '../../../domain/entities/shop.dart';
 import '../../widgets/cloud_widgets.dart';
 
 enum _Phase { intro, loading, question, checking, answered, over, error }
@@ -98,6 +100,25 @@ class _EndlessScreenState extends ConsumerState<EndlessScreen> with SingleTicker
     }
   }
 
+  bool _revived = false;
+
+  Future<void> _extraLife() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final claim = await watchRewardedAd(ref, RewardType.extraLife);
+      if (claim?.applied == true) {
+        _revived = true;
+        await _load();
+      } else {
+        messenger.showSnackBar(SnackBar(
+          content: Text(claim == null ? 'Watch the whole ad to get an extra life.' : 'Extra life is not available for this run.'),
+        ));
+      }
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(cloudErrorText(e))));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -140,7 +161,10 @@ class _EndlessScreenState extends ConsumerState<EndlessScreen> with SingleTicker
   Widget _body(ThemeData theme, EndlessPuzzle? p, EndlessVerdict? v) {
     switch (_phase) {
       case _Phase.intro:
-        return _Intro(onStart: () => _load(newRun: true));
+        return _Intro(onStart: () {
+          _revived = false;
+          _load(newRun: true);
+        });
       case _Phase.loading:
         return const Center(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -159,7 +183,14 @@ class _EndlessScreenState extends ConsumerState<EndlessScreen> with SingleTicker
           ),
         );
       case _Phase.over:
-        return _GameOver(verdict: v!, onRestart: () => _load(newRun: true));
+        return _GameOver(
+          verdict: v!,
+          onRestart: () {
+            _revived = false;
+            _load(newRun: true);
+          },
+          onExtraLife: _revived ? null : _extraLife,
+        );
       case _Phase.question:
       case _Phase.checking:
       case _Phase.answered:
@@ -348,9 +379,12 @@ class _Choice extends StatelessWidget {
 }
 
 class _GameOver extends StatelessWidget {
-  const _GameOver({required this.verdict, required this.onRestart});
+  const _GameOver({required this.verdict, required this.onRestart, this.onExtraLife});
   final EndlessVerdict verdict;
   final VoidCallback onRestart;
+
+  /// Null once this run already used its rewarded extra life.
+  final VoidCallback? onExtraLife;
 
   @override
   Widget build(BuildContext context) {
@@ -368,6 +402,17 @@ class _GameOver extends StatelessWidget {
         ),
         Text(verdict.run >= best && best > 0 ? 'New best run!' : 'Best run: $best', style: theme.textTheme.bodyLarge),
         const Spacer(),
+        if (onExtraLife != null) ...[
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onExtraLife,
+              icon: const Icon(Icons.favorite_rounded),
+              label: const Text('Watch an ad for an extra life'),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         SizedBox(
           width: double.infinity,
           child: FilledButton.icon(onPressed: onRestart, icon: const Icon(Icons.replay_rounded), label: const Text('New run')),

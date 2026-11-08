@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../../core/legal.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../domain/entities/app_settings.dart';
 import '../../../domain/games/word_scramble_logic.dart';
 import '../../providers/app_providers.dart';
+import '../../providers/shop_providers.dart';
 import '../../widgets/common.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -46,14 +52,28 @@ class SettingsScreen extends ConsumerWidget {
           Card(
             child: Padding(
               padding: const EdgeInsets.all(12),
-              child: SegmentedButton<AppThemeMode>(
-                segments: const [
-                  ButtonSegment(value: AppThemeMode.system, label: Text('System'), icon: Icon(Icons.brightness_auto)),
-                  ButtonSegment(value: AppThemeMode.light, label: Text('Light'), icon: Icon(Icons.light_mode)),
-                  ButtonSegment(value: AppThemeMode.dark, label: Text('Dark'), icon: Icon(Icons.dark_mode)),
+              child: Column(
+                children: [
+                  SegmentedButton<AppThemeMode>(
+                    segments: const [
+                      ButtonSegment(value: AppThemeMode.system, label: Text('System'), icon: Icon(Icons.brightness_auto)),
+                      ButtonSegment(value: AppThemeMode.light, label: Text('Light'), icon: Icon(Icons.light_mode)),
+                      ButtonSegment(value: AppThemeMode.dark, label: Text('Dark'), icon: Icon(Icons.dark_mode)),
+                    ],
+                    emptySelectionAllowed: true,
+                    selected: s.themeMode.premiumId == null ? {s.themeMode} : {},
+                    onSelectionChanged: (v) {
+                      if (v.isNotEmpty) n.update((x) => x.copyWith(themeMode: v.first));
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      for (final m in AppThemeMode.values.where((m) => m.premiumId != null))
+                        Expanded(child: _NeonThemeTile(mode: m, selected: s.themeMode == m)),
+                    ],
+                  ),
                 ],
-                selected: {s.themeMode},
-                onSelectionChanged: (v) => n.update((x) => x.copyWith(themeMode: v.first)),
               ),
             ),
           ),
@@ -142,6 +162,36 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
           ),
+          const SectionHeader('Privacy'),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.privacy_tip_rounded),
+                  title: const Text('Privacy policy'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => context.push('/privacy'),
+                ),
+                FutureBuilder<bool>(
+                  future: ref.read(adsServiceProvider).privacyOptionsRequired(),
+                  builder: (_, snap) => snap.data == true
+                      ? ListTile(
+                          leading: const Icon(Icons.ads_click_rounded),
+                          title: const Text('Ad privacy choices'),
+                          onTap: () => ref.read(adsServiceProvider).showPrivacyOptions(),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+                if (Legal.supportEmail.isNotEmpty)
+                  ListTile(
+                    leading: const Icon(Icons.mail_outline_rounded),
+                    title: const Text('Contact support'),
+                    subtitle: const Text(Legal.supportEmail),
+                    onTap: () => launchUrl(Uri(scheme: 'mailto', path: Legal.supportEmail, query: 'subject=NeuroRush support')),
+                  ),
+              ],
+            ),
+          ),
           const SectionHeader('Data'),
           Card(
             child: ListTile(
@@ -153,6 +203,51 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 24),
           const Center(child: Text('NeuroRush 1.0.0')),
         ],
+      ),
+    );
+  }
+}
+
+class _NeonThemeTile extends ConsumerWidget {
+  const _NeonThemeTile({required this.mode, required this.selected});
+  final AppThemeMode mode;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final (bg, a, b) = AppTheme.preview(mode);
+    final owned = ref.watch(entitlementsProvider).ownsTheme(mode.premiumId!, DateTime.now());
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${mode.label} theme${owned ? '' : ', locked'}',
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: () => owned
+            ? ref.read(settingsProvider.notifier).update((s) => s.copyWith(themeMode: mode))
+            : context.push('/shop'),
+        child: Container(
+          height: 76,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: selected ? a : Colors.transparent, width: 3),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                CircleAvatar(radius: 7, backgroundColor: a),
+                const SizedBox(width: 4),
+                CircleAvatar(radius: 7, backgroundColor: b),
+                if (!owned) ...[const SizedBox(width: 4), const Icon(Icons.lock_rounded, size: 14, color: Colors.white70)],
+              ]),
+              const SizedBox(height: 6),
+              Text(mode.label, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ),
       ),
     );
   }

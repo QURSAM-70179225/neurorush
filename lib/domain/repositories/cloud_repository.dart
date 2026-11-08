@@ -1,6 +1,7 @@
 import '../entities/ai_models.dart';
 import '../entities/cloud_models.dart';
 import '../entities/game_result.dart';
+import '../entities/shop.dart';
 
 /// Network / server unavailable: the operation can be retried later.
 class CloudUnavailable implements Exception {
@@ -55,4 +56,17 @@ abstract interface class CloudRepository {
 
   /// [answerIndex] -1 means the timer ran out.
   Future<EndlessVerdict> submitEndlessAnswer(String puzzleId, int answerIndex);
+
+  /// Server-side Google Play verification; returns the updated entitlements.
+  Future<Entitlements> verifyPurchase(String productId, String purchaseToken);
+
+  /// Buys "streak_freeze" or a "theme:ID" with coins.
+  Future<CoinSpend> spendCoins(String item);
+
+  /// Applies a rewarded ad once AdMob has verified it (server-side). Throws
+  /// [CloudFailure] with code "not-found" while verification is pending.
+  Future<RewardClaim> claimAdReward(String nonce);
+
+  /// Permanently deletes the account and all its data.
+  Future<void> deleteAccount();
 }

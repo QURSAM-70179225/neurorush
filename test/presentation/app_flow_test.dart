@@ -70,7 +70,7 @@ void main() {
     expect(find.text('Save your progress with a free account.'), findsOneWidget);
 
     // Sign out returns to the auth screen.
-    await tester.scrollUntilVisible(find.text('Sign out'), 300, scrollable: find.byType(Scrollable).last);
+    await scrollTo(tester, find.text('Delete account'));
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Sign out'));

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../domain/entities/app_settings.dart';
 import 'app_palette.dart';
 
 class AppTheme {
@@ -8,15 +9,35 @@ class AppTheme {
   static ThemeData light() => _build(Brightness.light);
   static ThemeData dark() => _build(Brightness.dark);
 
-  static ThemeData _build(Brightness b) {
+  /// Premium neon themes (dark, high-contrast accents).
+  static ThemeData neon(AppThemeMode mode) {
+    final (primary, secondary, bg, surface) = switch (mode) {
+      AppThemeMode.neonOcean => (const Color(0xFF00E5FF), const Color(0xFF448AFF), const Color(0xFF021024), const Color(0xFF0A2238)),
+      AppThemeMode.neonSunset => (const Color(0xFFFF9100), const Color(0xFFFF4081), const Color(0xFF1A0612), const Color(0xFF2E0C1F)),
+      _ => (const Color(0xFFE040FB), const Color(0xFF18FFFF), const Color(0xFF07021A), const Color(0xFF170A33)),
+    };
+    return _build(Brightness.dark, primary: primary, secondary: secondary, background: bg, surfaceColor: surface);
+  }
+
+  /// Colours used to preview a theme in Settings.
+  static (Color, Color, Color) preview(AppThemeMode mode) {
+    final t = switch (mode) {
+      AppThemeMode.light => light(),
+      AppThemeMode.dark || AppThemeMode.system => dark(),
+      _ => neon(mode),
+    };
+    return (t.scaffoldBackgroundColor, t.colorScheme.primary, t.colorScheme.secondary);
+  }
+
+  static ThemeData _build(Brightness b, {Color? primary, Color? secondary, Color? background, Color? surfaceColor}) {
     final dark = b == Brightness.dark;
     final scheme = ColorScheme.fromSeed(
-      seedColor: AppPalette.violet,
+      seedColor: primary ?? AppPalette.violet,
       brightness: b,
-      primary: AppPalette.violet,
-      secondary: AppPalette.pink,
+      primary: primary ?? AppPalette.violet,
+      secondary: secondary ?? AppPalette.pink,
       tertiary: AppPalette.cyan,
-      surface: dark ? AppPalette.darkSurface : Colors.white,
+      surface: surfaceColor ?? (dark ? AppPalette.darkSurface : Colors.white),
     );
     final base = ThemeData(useMaterial3: true, colorScheme: scheme, brightness: b);
     final text = base.textTheme.apply(
@@ -25,7 +46,7 @@ class AppTheme {
     );
     final rounded = RoundedRectangleBorder(borderRadius: BorderRadius.circular(18));
     return base.copyWith(
-      scaffoldBackgroundColor: dark ? AppPalette.darkBg : AppPalette.lightBg,
+      scaffoldBackgroundColor: background ?? (dark ? AppPalette.darkBg : AppPalette.lightBg),
       textTheme: text.copyWith(
         headlineLarge: text.headlineLarge?.copyWith(fontWeight: FontWeight.w800),
         headlineMedium: text.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
@@ -71,8 +92,8 @@ class AppTheme {
         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: dark ? AppPalette.darkSurface : Colors.white,
-        indicatorColor: AppPalette.violet.withValues(alpha: 0.18),
+        backgroundColor: surfaceColor ?? (dark ? AppPalette.darkSurface : Colors.white),
+        indicatorColor: (primary ?? AppPalette.violet).withValues(alpha: 0.18),
         // 11sp keeps "Leaderboard" on one line with 5 tabs on 360dp phones.
         labelTextStyle: WidgetStatePropertyAll(
           text.labelSmall?.copyWith(fontSize: 11, fontWeight: FontWeight.w700),

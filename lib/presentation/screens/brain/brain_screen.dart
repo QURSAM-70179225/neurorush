@@ -7,6 +7,8 @@ import '../../../domain/entities/game_type.dart';
 import '../../../domain/entities/skill.dart';
 import '../../../domain/logic/brain_score.dart';
 import '../../providers/app_providers.dart';
+import '../../providers/cloud_providers.dart';
+import '../../providers/shop_providers.dart';
 import '../../widgets/brain_widgets.dart';
 import '../../widgets/common.dart';
 
@@ -21,8 +23,19 @@ class BrainScreen extends ConsumerStatefulWidget {
 class _BrainScreenState extends ConsumerState<BrainScreen> {
   int _days = 7;
 
+  void _offerPro() {
+    final cloud = ref.read(cloudRepositoryProvider).isAvailable;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: const Text('30-day trends are part of NeuroRush Pro.'),
+        action: cloud ? SnackBarAction(label: 'See Pro', onPressed: () => context.push('/shop')) : null,
+      ));
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.watch(entitlementsProvider); // keep Pro status loaded for the 30-day gate
     final score = ref.watch(brainScoreProvider);
     final history = ref.watch(gameHistoryProvider);
     final now = ref.watch(clockProvider)();
@@ -64,7 +77,14 @@ class _BrainScreenState extends ConsumerState<BrainScreen> {
               showSelectedIcon: false,
               segments: const [ButtonSegment(value: 7, label: Text('7 days')), ButtonSegment(value: 30, label: Text('30 days'))],
               selected: {_days},
-              onSelectionChanged: (v) => setState(() => _days = v.first),
+              onSelectionChanged: (v) {
+                // 30-day trends are an advanced stat in NeuroRush Pro.
+                if (v.first == 30 && !ref.read(entitlementsProvider).proActive(DateTime.now())) {
+                  _offerPro();
+                  return;
+                }
+                setState(() => _days = v.first);
+              },
             ),
           ),
           Card(

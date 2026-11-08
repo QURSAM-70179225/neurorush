@@ -1,6 +1,7 @@
 import '../../domain/entities/ai_models.dart';
 import '../../domain/entities/cloud_models.dart';
 import '../../domain/entities/game_result.dart';
+import '../../domain/entities/shop.dart';
 import '../../domain/repositories/cloud_repository.dart';
 
 /// Used when Firebase is not available: every online feature reports that it
@@ -51,4 +52,12 @@ class OfflineCloudRepository implements CloudRepository {
   Future<EndlessPuzzle> getEndlessPuzzle({bool newRun = false}) => Future.error(_unavailable);
   @override
   Future<EndlessVerdict> submitEndlessAnswer(String puzzleId, int answerIndex) => Future.error(_unavailable);
+  @override
+  Future<Entitlements> verifyPurchase(String productId, String purchaseToken) => Future.error(_unavailable);
+  @override
+  Future<CoinSpend> spendCoins(String item) => Future.error(_unavailable);
+  @override
+  Future<RewardClaim> claimAdReward(String nonce) => Future.error(_unavailable);
+  @override
+  Future<void> deleteAccount() => Future.error(_unavailable);
 }

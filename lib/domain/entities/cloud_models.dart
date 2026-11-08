@@ -1,3 +1,4 @@
+import 'shop.dart';
 import 'skill.dart';
 
 /// Public profile from users/{uid}.
@@ -21,6 +22,7 @@ class CloudProfile {
     this.battleWins = 0,
     this.battleLosses = 0,
     this.battleDraws = 0,
+    this.entitlements = Entitlements.none,
     this.lastActiveAt,
   });
 
@@ -44,6 +46,9 @@ class CloudProfile {
   final int battleWins;
   final int battleLosses;
   final int battleDraws;
+
+  /// Purchases, coins and freezes (server-granted).
+  final Entitlements entitlements;
   final DateTime? lastActiveAt;
 
   String get name {
@@ -133,6 +138,13 @@ class FriendRequest {
 }
 
 enum SubmitStatus { accepted, duplicate, rejected }
+
+/// Result of an account-wide coin purchase.
+class CoinSpend {
+  const CoinSpend({required this.coins, required this.freezes});
+  final int coins;
+  final int freezes;
+}
 
 class SubmitOutcome {
   const SubmitOutcome({required this.status, this.reason, this.newAchievements = const []});

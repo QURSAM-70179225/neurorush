@@ -7,7 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:neurorush/core/feedback/feedback_service.dart';
 import 'package:neurorush/data/repositories/offline_cloud_repository.dart';
 import 'package:neurorush/domain/entities/achievement.dart';
+import 'package:neurorush/core/ads/ads_service.dart';
+import 'package:neurorush/core/billing/billing_service.dart';
 import 'package:neurorush/core/push/push_service.dart';
+import 'package:neurorush/domain/entities/shop.dart';
 import 'package:neurorush/domain/entities/ai_models.dart';
 import 'package:neurorush/domain/entities/battle.dart';
 import 'package:neurorush/domain/repositories/battle_repository.dart';
@@ -15,6 +18,7 @@ import 'package:neurorush/domain/repositories/push_repository.dart';
 import 'package:neurorush/domain/entities/cloud_models.dart';
 import 'package:neurorush/domain/repositories/cloud_repository.dart';
 import 'package:neurorush/presentation/providers/cloud_providers.dart';
+import 'package:neurorush/presentation/providers/shop_providers.dart';
 import 'package:neurorush/domain/entities/app_settings.dart';
 import 'package:neurorush/domain/entities/game_result.dart';
 import 'package:neurorush/domain/entities/game_type.dart';
@@ -151,6 +155,7 @@ List<Override> testOverrides({
 }) =>
     [
       cloudRepositoryProvider.overrideWithValue(cloud ?? const OfflineCloudRepository()),
+      pendingRewardStoreProvider.overrideWithValue(MemoryPendingRewardStore()),
       achievementCatalogProvider.overrideWithValue(testCatalogue),
       progressRepositoryProvider.overrideWithValue(progress ?? MemoryProgressRepository()),
       if (clock != null) clockProvider.overrideWithValue(clock),
@@ -460,6 +465,51 @@ class FakeCloudRepository implements CloudRepository {
       bestRun: endlessBest, gameOver: endlessLives == 0, timedOut: answerIndex == -1,
     );
   }
+
+  // --- shop & account -----------------------------------------------------------
+  final verified = <String>[];
+  Entitlements entitlementsAfterPurchase = const Entitlements(removeAds: true);
+  Object? verifyError;
+  int coins = 0;
+  final spent = <String>[];
+  int claimNotFoundTimes = 0;
+  RewardClaim claimResult = const RewardClaim(applied: true);
+  final claims = <String>[];
+  bool deleted = false;
+
+  @override
+  Future<Entitlements> verifyPurchase(String productId, String purchaseToken) async {
+    _check();
+    if (verifyError != null) throw verifyError!;
+    verified.add('$productId:$purchaseToken');
+    return entitlementsAfterPurchase;
+  }
+
+  @override
+  Future<CoinSpend> spendCoins(String item) async {
+    _check();
+    spent.add(item);
+    if (coins < 100) throw const CloudFailure('You need more coins.', code: 'failed-precondition');
+    coins -= 100;
+    return CoinSpend(coins: coins, freezes: 1);
+  }
+
+  @override
+  Future<RewardClaim> claimAdReward(String nonce) async {
+    _check();
+    claims.add(nonce);
+    if (claimNotFoundTimes > 0) {
+      claimNotFoundTimes--;
+      throw const CloudFailure('Reward not verified yet.', code: 'not-found');
+    }
+    return claimResult;
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    _check();
+    deleted = true;
+  }
 }
 
 /// Scriptable battle backend for widget tests.
@@ -569,4 +619,62 @@ class FakePushRepository implements PushRepository {
   Future<void> saveTarget(String uid, {required String token, required int tzOffsetMinutes, required PushPrefs prefs}) async {
     saves.add({'uid': uid, 'token': token, 'tz': tzOffsetMinutes, ...prefs.toMap()});
   }
+}
+
+class FakeAdsService implements AdsService {
+  int interstitials = 0;
+  bool rewardEarned = true;
+  final rewarded = <String>[];
+  @override
+  Future<void> init() async {}
+  @override
+  Future<bool> showInterstitial() async {
+    interstitials++;
+    return true;
+  }
+
+  @override
+  Future<bool> showRewarded({required String userId, required String customData}) async {
+    rewarded.add('$userId|$customData');
+    return rewardEarned;
+  }
+
+  @override
+  Future<bool> privacyOptionsRequired() async => true;
+  @override
+  Future<void> showPrivacyOptions() async {}
+}
+
+class FakeBillingService implements BillingService {
+  final _updates = StreamController<PurchaseUpdate>.broadcast();
+  final bought = <String>[];
+  final completed = <String>[];
+  int restores = 0;
+  @override
+  Future<bool> isAvailable() async => true;
+  @override
+  Future<List<StoreProduct>> products(Set<String> ids) async => [
+        for (final id in ids) StoreProduct(id: id, title: id, price: id == ProductIds.pro ? 'Rs 450' : 'Rs 290'),
+      ];
+  @override
+  Future<void> buy(StoreProduct product, {required String accountId}) async {
+    bought.add('${product.id}:$accountId');
+    _updates.add(PurchaseUpdate(productId: product.id, status: PurchaseUpdateStatus.purchased, token: 'token-${product.id}'));
+  }
+
+  @override
+  Future<void> restore({required String accountId}) async => restores++;
+  void emit(PurchaseUpdate u) => _updates.add(u);
+  @override
+  Stream<PurchaseUpdate> get updates => _updates.stream;
+  @override
+  Future<void> complete(PurchaseUpdate update) async => completed.add(update.productId);
+}
+
+class MemoryPendingRewardStore implements PendingRewardStore {
+  List<String> items = [];
+  @override
+  List<String> read() => List.of(items);
+  @override
+  Future<void> write(List<String> nonces) async => items = List.of(nonces);
 }

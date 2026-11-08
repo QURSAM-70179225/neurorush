@@ -177,6 +177,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       child: const Text('Play as guest'),
                     ),
                   ],
+                  const SizedBox(height: 8),
+                  TextButton(onPressed: () => context.push('/privacy'), child: const Text('Privacy policy')),
                   if (_busy) ...[
                     const SizedBox(height: 16),
                     const Center(child: CircularProgressIndicator()),

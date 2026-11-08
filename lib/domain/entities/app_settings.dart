@@ -1,6 +1,30 @@
 import '../games/word_scramble_logic.dart';
 
-enum AppThemeMode { system, light, dark }
+enum AppThemeMode {
+  system,
+  light,
+  dark,
+  neonPulse,
+  neonOcean,
+  neonSunset;
+
+  /// Premium theme id used for purchases, or null for free modes.
+  String? get premiumId => switch (this) {
+        AppThemeMode.neonPulse => 'neon_pulse',
+        AppThemeMode.neonOcean => 'neon_ocean',
+        AppThemeMode.neonSunset => 'neon_sunset',
+        _ => null,
+      };
+
+  String get label => switch (this) {
+        AppThemeMode.system => 'System',
+        AppThemeMode.light => 'Light',
+        AppThemeMode.dark => 'Dark',
+        AppThemeMode.neonPulse => 'Neon Pulse',
+        AppThemeMode.neonOcean => 'Neon Ocean',
+        AppThemeMode.neonSunset => 'Neon Sunset',
+      };
+}
 
 class AppSettings {
   const AppSettings({

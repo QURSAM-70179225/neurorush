@@ -14,6 +14,7 @@ import '../../domain/entities/game_type.dart';
 import '../../domain/logic/rewards.dart';
 import '../providers/app_providers.dart';
 import '../providers/cloud_providers.dart';
+import '../providers/shop_providers.dart';
 import 'results_args.dart';
 import 'game_session.dart';
 
@@ -175,6 +176,7 @@ class _GameShellState extends ConsumerState<GameShell>
     final levelBefore = ref.read(levelProvider).level;
     final streakBefore = ref.read(streakProvider).current;
     final stored = await ref.read(gameHistoryProvider.notifier).add(result);
+    ref.read(interstitialPolicyProvider).gameFinished();
     final levelAfter = ref.read(levelProvider).level;
     final streakAfter = ref.read(streakProvider).current;
     final newBadges = ref

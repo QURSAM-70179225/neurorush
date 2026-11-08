@@ -41,10 +41,9 @@ void main() {
     expect(byId['cheat']!.rejectReason, 'score_too_high');
     expect(c.read(pendingSyncCountProvider), 0);
     expect(c.read(syncProvider).phase, SyncPhase.idle);
-    // Streak, country and daily workout are published.
-    expect(cloud.profileUpdates[testUid], containsPair('currentStreak', 2)); // yesterday + today
-    expect(cloud.profileUpdates[testUid]!['streakDay'], '2026-03-10');
+    // Country and daily workout are published; streaks are computed by the server.
     expect(cloud.profileUpdates[testUid]!.containsKey('country'), isTrue);
+    expect(cloud.profileUpdates[testUid]!.containsKey('currentStreak'), isFalse);
     expect(cloud.calls, contains('workout:2026-03-10'));
   });
 
