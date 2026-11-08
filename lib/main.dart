@@ -121,8 +121,8 @@ Future<_Backends> _createBackends(HiveStore store, ServerClock clock) async {
       push: FirebasePushService(FirebaseMessaging.instance),
       pushRepo: FirebasePushRepository(db),
       config: config,
-      ads: GoogleAdsService(),
-      billing: PlayBillingService(InAppPurchase.instance),
+      ads: kIsWeb ? const NoopAdsService() : GoogleAdsService(),
+      billing: kIsWeb ? const UnavailableBillingService() : PlayBillingService(InAppPurchase.instance),
     );
   } catch (e) {
     debugPrint('Firebase unavailable, running in offline mode: $e');
@@ -134,7 +134,7 @@ Future<_Backends> _createBackends(HiveStore store, ServerClock clock) async {
       pushRepo: null,
       config: const AppConfig(),
       // Ads still work offline-first; purchases need the server to verify.
-      ads: GoogleAdsService(),
+      ads: kIsWeb ? const NoopAdsService() : GoogleAdsService(),
       billing: const UnavailableBillingService(),
     );
   }
