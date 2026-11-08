@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/feedback/feedback_service.dart';
@@ -18,6 +20,7 @@ import '../../domain/repositories/auth_repository.dart';
 import '../../domain/repositories/game_history_repository.dart';
 import '../../domain/repositories/progress_repository.dart';
 import '../../domain/repositories/settings_repository.dart';
+import 'cloud_providers.dart';
 
 /// Overridden in main() once Hive is open.
 final hiveStoreProvider = Provider<HiveStore>(
@@ -82,25 +85,62 @@ final currentUserProvider = Provider<UserProfile?>((ref) {
   return async.hasValue ? async.value : ref.watch(authRepositoryProvider).currentUser;
 });
 
+/// Uid of the signed-in player (null when signed out).
+final currentUidProvider = Provider<String?>((ref) => ref.watch(currentUserProvider)?.uid);
+
+/// Local history of the signed-in player, newest first.
 class GameHistoryNotifier extends Notifier<List<GameResult>> {
   @override
-  List<GameResult> build() => ref.watch(gameHistoryRepositoryProvider).all();
+  List<GameResult> build() {
+    final uid = ref.watch(currentUidProvider);
+    if (uid == null) return const [];
+    final repo = ref.watch(gameHistoryRepositoryProvider);
+    // Rounds saved before accounts existed belong to the first player.
+    Future.microtask(() async {
+      if (await repo.claimUnowned(uid) > 0 && ref.mounted) ref.invalidateSelf();
+    });
+    return repo.all(uid);
+  }
 
   /// Saves [result], marking it as a personal best when it beats every
   /// previous score in the same game. Returns the stored result.
   Future<GameResult> add(GameResult result) async {
     final previousBest = state
-        .where((r) => r.gameType == result.gameType)
+        .where((r) => r.gameType == result.gameType && r.durationSeconds == result.durationSeconds)
         .fold<int>(0, (best, r) => r.score > best ? r.score : best);
-    final stored = result.copyWith(isPersonalBest: result.score > 0 && result.score > previousBest);
+    final stored = result.copyWith(
+      isPersonalBest: result.score > 0 && result.score > previousBest,
+      ownerUid: ref.read(currentUidProvider),
+    );
     await ref.read(gameHistoryRepositoryProvider).save(stored);
     state = [stored, ...state];
     await ref.read(progressProvider.notifier).refresh();
+    unawaited(ref.read(syncProvider.notifier).sync());
     return stored;
   }
 
+  /// Replaces a stored round (e.g. after it was synced).
+  Future<void> replace(GameResult updated) async {
+    await ref.read(gameHistoryRepositoryProvider).save(updated);
+    state = [for (final r in state) r.id == updated.id ? updated : r];
+  }
+
+  /// Adds rounds downloaded from the cloud that are not stored locally.
+  Future<int> mergeRemote(List<GameResult> remote) async {
+    final have = {for (final r in state) r.id};
+    final fresh = remote.where((r) => !have.contains(r.id)).toList();
+    if (fresh.isEmpty) return 0;
+    final repo = ref.read(gameHistoryRepositoryProvider);
+    for (final r in fresh) {
+      await repo.save(r);
+    }
+    state = [...state, ...fresh]..sort((a, b) => b.playedAt.compareTo(a.playedAt));
+    return fresh.length;
+  }
+
   Future<void> clear() async {
-    await ref.read(gameHistoryRepositoryProvider).clear();
+    final uid = ref.read(currentUidProvider);
+    if (uid != null) await ref.read(gameHistoryRepositoryProvider).clear(uid);
     state = const [];
   }
 }
@@ -122,7 +162,15 @@ class StreakUpdate {
 
 class ProgressNotifier extends Notifier<ProgressState> {
   @override
-  ProgressState build() => ref.watch(progressRepositoryProvider).load();
+  ProgressState build() {
+    final uid = ref.watch(currentUidProvider);
+    return uid == null ? const ProgressState() : ref.watch(progressRepositoryProvider).load(uid);
+  }
+
+  Future<void> _save(ProgressState s) async {
+    final uid = ref.read(currentUidProvider);
+    if (uid != null) await ref.read(progressRepositoryProvider).save(uid, s);
+  }
 
   Set<DateTime> _playedDays() => ref.read(gameHistoryProvider).map((r) => dayOf(r.playedAt)).toSet();
 
@@ -153,24 +201,24 @@ class ProgressNotifier extends Notifier<ProgressState> {
     }
     if (!identical(s, state)) {
       state = s;
-      await ref.read(progressRepositoryProvider).save(s);
+      await _save(s);
     }
     return StreakUpdate(frozenDays: toFreeze.length, freezeEarned: earned);
   }
 
   Future<void> addFreezes(int n) async {
     state = state.copyWith(freezes: (state.freezes + n).clamp(0, StreakLogic.maxFreezes));
-    await ref.read(progressRepositoryProvider).save(state);
+    await _save(state);
   }
 
   Future<void> markBrainTestDone() async {
     state = state.copyWith(brainTestDone: true);
-    await ref.read(progressRepositoryProvider).save(state);
+    await _save(state);
   }
 
   Future<void> reset() async {
     state = const ProgressState();
-    await ref.read(progressRepositoryProvider).save(state);
+    await _save(state);
   }
 }
 

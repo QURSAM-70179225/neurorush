@@ -57,6 +57,12 @@ void main() {
 
     await tester.tap(find.text('Leaderboard'));
     await tester.pumpAndSettle();
+    // Offline build: online boards explain themselves; Records still work.
+    expect(find.textContaining('Leaderboards need an online account'), findsOneWidget);
+    await tester.ensureVisible(find.text('Records'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Records'));
+    await tester.pumpAndSettle();
     expect(find.text('Not played yet'), findsWidgets);
 
     await tester.tap(find.text('Profile'));
@@ -90,7 +96,10 @@ void main() {
   testWidgets('email sign-in validates input and shows errors', (tester) async {
     usePhoneSize(tester);
     await tester.pumpWidget(ProviderScope(
-      overrides: testOverrides(settings: MemorySettingsRepository(const AppSettings(onboardingDone: true, brainTestOffered: true))),
+      overrides: testOverrides(
+        auth: FakeAuthRepository(),
+        settings: MemorySettingsRepository(const AppSettings(onboardingDone: true, brainTestOffered: true)),
+      ),
       child: const NeuroRushApp(),
     ));
     await tester.pumpAndSettle();

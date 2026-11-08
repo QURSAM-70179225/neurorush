@@ -7,6 +7,7 @@ import '../../../core/theme/app_palette.dart';
 import '../../../domain/entities/game_result.dart';
 import '../../../domain/logic/xp_levels.dart';
 import '../../game/results_args.dart';
+import '../../widgets/achievement_icons.dart';
 import '../../widgets/common.dart';
 
 class ResultsScreen extends StatefulWidget {
@@ -26,7 +27,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
   void initState() {
     super.initState();
     final r = widget.result;
-    final celebrate = widget.args.justPlayed && (r.stars == 3 || r.isPersonalBest || widget.args.leveledUpTo != null);
+    final celebrate = widget.args.justPlayed &&
+        (r.stars == 3 || r.isPersonalBest || widget.args.leveledUpTo != null || widget.args.newBadges.isNotEmpty);
     final reduceMotion = WidgetsBinding.instance.platformDispatcher.accessibilityFeatures.disableAnimations;
     if (celebrate && !reduceMotion) {
       Future<void>.delayed(const Duration(milliseconds: 900), () {
@@ -143,6 +145,13 @@ class _ResultsScreenState extends State<ResultsScreen> {
                     title: '$days-day streak!',
                     subtitle: days == 1 ? 'Come back tomorrow to keep it going.' : 'Keep the flame alive tomorrow.',
                   ).animate(delay: 1500.ms).fadeIn().slideY(begin: 0.3),
+                for (final (i, b) in widget.args.newBadges.indexed)
+                  _Banner(
+                    icon: achievementIcon(b.icon),
+                    color: AppPalette.amber,
+                    title: 'Badge unlocked: ${b.title}',
+                    subtitle: b.description,
+                  ).animate(delay: (1700 + 200 * i).ms).fadeIn().slideY(begin: 0.3),
                 const SizedBox(height: 16),
                 StatGrid(
                   children: [

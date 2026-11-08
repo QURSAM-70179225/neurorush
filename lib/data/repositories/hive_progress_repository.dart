@@ -6,14 +6,22 @@ import '../../domain/repositories/progress_repository.dart';
 class HiveProgressRepository implements ProgressRepository {
   HiveProgressRepository(this._box);
   final Box<dynamic> _box;
-  static const _key = 'progress';
+  /// Phase 2 stored a single device-wide record under this key.
+  static const _legacyKey = 'progress';
+  static String _key(String uid) => 'progress_$uid';
 
   @override
-  ProgressState load() {
-    final raw = _box.get(_key);
+  ProgressState load(String uid) {
+    var raw = _box.get(_key(uid));
+    // The first player to load inherits the pre-accounts record.
+    if (raw == null && _box.containsKey(_legacyKey)) {
+      raw = _box.get(_legacyKey);
+      _box.put(_key(uid), raw);
+      _box.delete(_legacyKey);
+    }
     return raw is Map ? ProgressState.fromMap(raw) : const ProgressState();
   }
 
   @override
-  Future<void> save(ProgressState state) => _box.put(_key, state.toMap());
+  Future<void> save(String uid, ProgressState state) => _box.put(_key(uid), state.toMap());
 }

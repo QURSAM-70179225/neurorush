@@ -2,13 +2,20 @@
 
 Fast, adaptive brain-training mini-games for Android (Flutter + Riverpod + Hive + Firebase).
 
-## Status: Phase 2 complete
+## Status: Phase 3 complete
 | Phase | Scope | State |
 |---|---|---|
 | 1 | Setup, auth (Google / email / guest + upgrade), navigation, 3 mini-games, local scoring | ✅ |
 | 2 | 5 more games (8 total), 50 XP levels, streaks + freezes, Brain Score, radar, Brain Test, Daily Workout, progress charts | ✅ |
-| 3 | Firebase sync, leaderboards, friends, achievements | next |
-| 4–7 | AI coach, battles, ads/IAP, rules, release | planned |
+| 3 | Offline-first cloud sync, server-validated scores, weekly leaderboards (global / country / friends), friends, 30 achievements | ✅ |
+| 4 | AI Brain Coach + Endless Mode (Groq via Cloud Functions) | next |
+| 5–7 | Battles + push, ads/IAP/subscription, polish + release | planned |
+
+### Online architecture (Phase 3)
+- **Single source of truth:** the server is the only writer of competitive data (XP, scores, leaderboards, badges, friendships). The client calls Cloud Functions, and `firestore.rules` blocks direct writes.
+- **Offline-first:** finished rounds are saved to Hive first (`syncState: pending`), then uploaded by `SyncNotifier`. Uploads happen after each round, at launch or resume, when connectivity returns, and from Profile → Cloud sync. On sign-in, rounds from other devices are downloaded.
+- **Per-player local data:** history and progress on the device are stored per uid, so another account on the same phone starts fresh.
+- **Achievements:** `shared/achievements.json` is read by both the app (unlocks offline) and Cloud Functions (grants them online).
 
 ### Games
 | Game | Skill | Notes |
@@ -46,6 +53,9 @@ lib/
     games/                      8 mini-game widgets (+ Flame board for Path Recall)
     screens/                    onboarding, auth, brain test, shell (5 tabs), home, games, results, brain score, battle, records, profile, settings
 test/                           unit (domain, data) + widget (app flow, game flow) tests
+functions/                      Cloud Functions (TypeScript) + jest unit / rules / emulator tests
+shared/achievements.json        badge catalogue used by app and server
+firestore.rules, firestore.indexes.json, firebase.json
 ```
 
 ## Run

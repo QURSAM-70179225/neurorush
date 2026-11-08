@@ -5,7 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_palette.dart';
 import '../../../domain/entities/user_profile.dart';
 import '../../providers/app_providers.dart';
+import '../../../domain/entities/countries.dart';
+import '../../providers/cloud_providers.dart';
 import '../../widgets/brain_widgets.dart';
+import '../../widgets/cloud_widgets.dart';
 import '../../widgets/common.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -31,6 +34,61 @@ class ProfileScreen extends ConsumerWidget {
     if (ok == true) await repo.signOut();
   }
 
+  Future<void> _editProfile(BuildContext context, WidgetRef ref) async {
+    final uid = ref.read(currentUidProvider);
+    if (uid == null) return;
+    final profile = ref.read(cloudProfileProvider).value;
+    final name = TextEditingController(text: profile?.displayName ?? ref.read(currentUserProvider)?.displayName ?? '');
+    var country = ref.read(myCountryProvider);
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (c) => StatefulBuilder(
+        builder: (c, setSheet) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.of(c).viewInsets.bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Edit profile', style: Theme.of(c).textTheme.titleLarge),
+              const SizedBox(height: 16),
+              TextField(
+                controller: name,
+                maxLength: 30,
+                decoration: const InputDecoration(labelText: 'Display name'),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: country,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Country (for the country leaderboard)'),
+                items: [
+                  for (final (code, label) in countries)
+                    DropdownMenuItem(value: code, child: Text('${countryFlag(code)}  $label', overflow: TextOverflow.ellipsis)),
+                ],
+                onChanged: (v) => setSheet(() => country = v ?? country),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Save')),
+            ],
+          ),
+        ),
+      ),
+    );
+    final displayName = name.text.trim();
+    name.dispose();
+    if (saved != true || !context.mounted) return;
+    await runCloudAction(
+      context,
+      () => ref.read(cloudRepositoryProvider).updateProfile(uid, {
+        'displayName': displayName.isEmpty ? null : displayName,
+        'country': country,
+      }),
+      success: 'Profile updated',
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
@@ -40,6 +98,10 @@ class ProfileScreen extends ConsumerWidget {
     final streak = ref.watch(streakProvider);
     final freezes = ref.watch(progressProvider).freezes;
     final brain = ref.watch(brainScoreProvider);
+    final cloudProfile = ref.watch(cloudProfileProvider).value;
+    final badges = ref.watch(unlockedAchievementsProvider).length;
+    final badgeTotal = ref.watch(achievementCatalogProvider).length;
+    final requests = ref.watch(friendRequestsProvider).value?.length ?? 0;
     final theme = Theme.of(context);
     if (user == null) return const Scaffold(body: SizedBox.shrink());
 
@@ -77,8 +139,14 @@ class ProfileScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(user.name, style: theme.textTheme.headlineSmall),
-                    Text(user.email ?? providerLabel, style: theme.textTheme.bodyMedium),
+                    Text(cloudProfile?.name ?? user.name, style: theme.textTheme.headlineSmall),
+                    Text(
+                      [
+                        if (cloudProfile?.username != null) '@${cloudProfile!.username}' else user.email ?? providerLabel,
+                        if (cloudProfile?.country != null) countryFlag(cloudProfile!.country!),
+                      ].join('  '),
+                      style: theme.textTheme.bodyMedium,
+                    ),
                   ],
                 ),
               ),
@@ -101,8 +169,47 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
           ],
-          const SizedBox(height: 16),
+          if (cloud) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => _editProfile(context, ref),
+                icon: const Icon(Icons.edit_rounded, size: 18),
+                label: const Text('Edit name & country'),
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
           Card(child: Padding(padding: const EdgeInsets.all(14), child: LevelBar(info: level))),
+          const SizedBox(height: 10),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.emoji_events_rounded, color: AppPalette.amber),
+                  title: const Text('Achievements'),
+                  subtitle: Text('$badges of $badgeTotal unlocked'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => context.push('/achievements'),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Badge(
+                    isLabelVisible: requests > 0,
+                    label: Text('$requests'),
+                    child: const Icon(Icons.group_rounded, color: AppPalette.cyan),
+                  ),
+                  title: const Text('Friends'),
+                  subtitle: Text(cloud ? '${cloudProfile?.friends ?? 0} friends' : 'Needs an online account'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => context.push('/friends'),
+                ),
+                const Divider(height: 1),
+                const _SyncTile(),
+              ],
+            ),
+          ),
           const SizedBox(height: 10),
           StatGrid(children: [
             StatTile(
@@ -156,6 +263,37 @@ class ProfileScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SyncTile extends ConsumerWidget {
+  const _SyncTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(syncProvider);
+    final pending = ref.watch(pendingSyncCountProvider);
+    final (icon, text) = switch (status.phase) {
+      SyncPhase.unavailable => (Icons.phone_android_rounded, 'Progress is saved on this device'),
+      SyncPhase.syncing => (Icons.sync_rounded, 'Syncing…'),
+      SyncPhase.offline => (Icons.cloud_off_rounded, pending > 0 ? '$pending rounds will sync when you are online' : 'Offline'),
+      SyncPhase.error => (Icons.error_outline_rounded, status.message ?? 'Sync failed'),
+      SyncPhase.idle => pending > 0
+          ? (Icons.cloud_upload_rounded, '$pending rounds waiting to sync')
+          : (Icons.cloud_done_rounded, 'All progress backed up'),
+    };
+    return ListTile(
+      leading: Icon(icon),
+      title: const Text('Cloud sync'),
+      subtitle: Text(text),
+      trailing: status.phase == SyncPhase.unavailable
+          ? null
+          : IconButton(
+              tooltip: 'Sync now',
+              onPressed: status.phase == SyncPhase.syncing ? null : () => ref.read(syncProvider.notifier).sync(),
+              icon: const Icon(Icons.refresh_rounded),
+            ),
     );
   }
 }

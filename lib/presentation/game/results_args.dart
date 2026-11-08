@@ -1,3 +1,4 @@
+import '../../domain/entities/achievement.dart';
 import '../../domain/entities/game_result.dart';
 
 /// Arguments for the results screen.
@@ -7,6 +8,7 @@ class ResultsArgs {
     this.justPlayed = false,
     this.leveledUpTo,
     this.streakExtendedTo,
+    this.newBadges = const [],
   });
 
   final GameResult result;
@@ -19,4 +21,7 @@ class ResultsArgs {
 
   /// New streak length if this round extended the daily streak.
   final int? streakExtendedTo;
+
+  /// Achievements unlocked by this round.
+  final List<Achievement> newBadges;
 }

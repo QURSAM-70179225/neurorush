@@ -1,9 +1,15 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neurorush/core/feedback/feedback_service.dart';
+import 'package:neurorush/data/repositories/offline_cloud_repository.dart';
+import 'package:neurorush/domain/entities/achievement.dart';
+import 'package:neurorush/domain/entities/cloud_models.dart';
+import 'package:neurorush/domain/repositories/cloud_repository.dart';
+import 'package:neurorush/presentation/providers/cloud_providers.dart';
 import 'package:neurorush/domain/entities/app_settings.dart';
 import 'package:neurorush/domain/entities/game_result.dart';
 import 'package:neurorush/domain/entities/game_type.dart';
@@ -86,25 +92,49 @@ class MemorySettingsRepository implements SettingsRepository {
   Future<void> save(AppSettings settings) async => value = settings;
 }
 
+/// Uid of the player signed in by default in tests.
+const testUid = 'test-user';
+const testUser = UserProfile(uid: testUid, provider: AuthProviderKind.guest);
+
 class MemoryHistoryRepository implements GameHistoryRepository {
   MemoryHistoryRepository([List<GameResult>? initial]) : items = [...?initial];
   final List<GameResult> items;
   @override
-  List<GameResult> all() => [...items]..sort((a, b) => b.playedAt.compareTo(a.playedAt));
+  List<GameResult> all(String uid) =>
+      items.where((r) => r.ownerUid == uid).toList()..sort((a, b) => b.playedAt.compareTo(a.playedAt));
   @override
-  Future<void> save(GameResult result) async => items.add(result);
+  Future<void> save(GameResult result) async {
+    items.removeWhere((r) => r.id == result.id);
+    items.add(result);
+  }
+
   @override
-  Future<void> clear() async => items.clear();
+  Future<void> clear(String uid) async => items.removeWhere((r) => r.ownerUid == uid);
+  @override
+  Future<int> claimUnowned(String uid) async {
+    var n = 0;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].ownerUid == null) {
+        items[i] = items[i].copyWith(ownerUid: uid);
+        n++;
+      }
+    }
+    return n;
+  }
 }
 
+/// Single-player progress store (ignores the uid).
 class MemoryProgressRepository implements ProgressRepository {
   MemoryProgressRepository([this.value = const ProgressState()]);
   ProgressState value;
   @override
-  ProgressState load() => value;
+  ProgressState load(String uid) => value;
   @override
-  Future<void> save(ProgressState state) async => value = state;
+  Future<void> save(String uid, ProgressState state) async => value = state;
 }
+
+/// The real badge catalogue shared with the server.
+final testCatalogue = Achievement.parseCatalogue(File('shared/achievements.json').readAsStringSync());
 
 List<Override> testOverrides({
   FakeAuthRepository? auth,
@@ -112,11 +142,14 @@ List<Override> testOverrides({
   MemoryHistoryRepository? history,
   MemoryProgressRepository? progress,
   DateTime Function()? clock,
+  CloudRepository? cloud,
 }) =>
     [
+      cloudRepositoryProvider.overrideWithValue(cloud ?? const OfflineCloudRepository()),
+      achievementCatalogProvider.overrideWithValue(testCatalogue),
       progressRepositoryProvider.overrideWithValue(progress ?? MemoryProgressRepository()),
       if (clock != null) clockProvider.overrideWithValue(clock),
-      authRepositoryProvider.overrideWithValue(auth ?? FakeAuthRepository()),
+      authRepositoryProvider.overrideWithValue(auth ?? FakeAuthRepository(user: testUser)),
       settingsRepositoryProvider.overrideWithValue(settings ?? MemorySettingsRepository()),
       gameHistoryRepositoryProvider.overrideWithValue(history ?? MemoryHistoryRepository()),
       feedbackServiceProvider.overrideWithValue(FeedbackService(enableAudio: false)),
@@ -199,6 +232,11 @@ GameResult sampleResult({
   int durationSeconds = 60,
   DateTime? at,
   String? id,
+  String? ownerUid = testUid,
+  SyncState syncState = SyncState.pending,
+  int? bestReactionMs = 500,
+  int stars = 2,
+  int maxCombo = 3,
 }) =>
     GameResult(
       id: id ?? '${type.id}-${at?.millisecondsSinceEpoch ?? score}-$xp',
@@ -206,14 +244,16 @@ GameResult sampleResult({
       score: score,
       correct: correct,
       wrong: wrong,
-      maxCombo: 3,
+      maxCombo: maxCombo,
       maxLevel: maxLevel,
-      avgReactionMs: 800,
-      bestReactionMs: 500,
-      stars: 2,
+      avgReactionMs: bestReactionMs == null ? null : 800,
+      bestReactionMs: bestReactionMs,
+      stars: stars,
       xp: xp,
       playedAt: at ?? DateTime(2026, 3, 10, 12),
       durationSeconds: durationSeconds,
+      ownerUid: ownerUid,
+      syncState: syncState,
     );
 
 /// Finds a [Semantics] widget by its exact label (works without enabling the
@@ -226,4 +266,139 @@ Future<void> scrollTo(WidgetTester tester, Finder finder) async {
   await tester.scrollUntilVisible(finder, 250, scrollable: find.byType(Scrollable).last);
   // Let entrance animations of newly built items finish.
   await tester.pumpAndSettle();
+}
+
+/// In-memory stand-in for Firestore + Cloud Functions.
+class FakeCloudRepository implements CloudRepository {
+  FakeCloudRepository({this.online = true});
+
+  bool online;
+  final List<GameResult> submitted = [];
+  final List<GameResult> remoteSessions = [];
+  final Map<String, Map<String, Object?>> profileUpdates = {};
+  final Map<String, CloudProfile> profiles = {};
+  final Set<String> rejectIds = {};
+  final List<LeaderboardEntry> board = [];
+  final List<String> friendUids = [];
+  final List<FriendRequest> requests = [];
+  final Map<String, DateTime> serverBadges = {};
+  final Map<String, String> usernames = {};
+  final List<String> calls = [];
+  final _profileCtl = StreamController<CloudProfile?>.broadcast();
+  final _requestsCtl = StreamController<List<FriendRequest>>.broadcast();
+  final _friendsCtl = StreamController<List<String>>.broadcast();
+
+  void _check() {
+    if (!online) throw const CloudUnavailable();
+  }
+
+  @override
+  bool get isAvailable => true;
+
+  @override
+  Future<SubmitOutcome> submitSession(GameResult result) async {
+    _check();
+    calls.add('submit:${result.id}');
+    if (rejectIds.contains(result.id)) return const SubmitOutcome(status: SubmitStatus.rejected, reason: 'score_too_high');
+    if (submitted.any((r) => r.id == result.id)) return const SubmitOutcome(status: SubmitStatus.duplicate);
+    submitted.add(result);
+    return const SubmitOutcome(status: SubmitStatus.accepted);
+  }
+
+  @override
+  Future<List<GameResult>> fetchRecentSessions(String uid, {int limit = 300}) async {
+    _check();
+    calls.add('fetch');
+    return remoteSessions;
+  }
+
+  @override
+  Stream<CloudProfile?> watchProfile(String uid) async* {
+    yield profiles[uid];
+    yield* _profileCtl.stream;
+  }
+
+  void emitProfile(CloudProfile p) {
+    profiles[p.uid] = p;
+    _profileCtl.add(p);
+  }
+
+  @override
+  Future<List<CloudProfile>> fetchProfiles(List<String> uids) async {
+    _check();
+    return [for (final u in uids) if (profiles[u] != null) profiles[u]!];
+  }
+
+  @override
+  Future<void> updateProfile(String uid, Map<String, Object?> fields) async {
+    _check();
+    (profileUpdates[uid] ??= {}).addAll(fields);
+  }
+
+  @override
+  Future<String> claimUsername(String username) async {
+    _check();
+    final n = username.toLowerCase();
+    if (usernames.containsKey(n)) throw const CloudFailure('That username is taken.');
+    usernames[n] = 'me';
+    return n;
+  }
+
+  @override
+  Future<LeaderboardPage> leaderboard(LeaderboardQuery query, String myUid) async {
+    _check();
+    calls.add('board:${query.scope.name}:${query.field}');
+    final list = query.scope == LeaderboardScope.friends
+        ? board.where((e) => query.friendUids.contains(e.uid) || e.uid == myUid).toList()
+        : board;
+    return LeaderboardPage(entries: list, me: board.where((e) => e.uid == myUid).firstOrNull);
+  }
+
+  @override
+  Stream<List<String>> watchFriendUids(String uid) async* {
+    yield List.of(friendUids);
+    yield* _friendsCtl.stream;
+  }
+
+  @override
+  Stream<List<FriendRequest>> watchFriendRequests(String uid) async* {
+    yield List.of(requests);
+    yield* _requestsCtl.stream;
+  }
+
+  @override
+  Future<FriendRequestResult> sendFriendRequest(String username) async {
+    _check();
+    calls.add('request:$username');
+    if (username == 'ghost') throw const CloudFailure('No player called "ghost".');
+    return FriendRequestResult.requested;
+  }
+
+  @override
+  Future<void> respondFriendRequest(String fromUid, {required bool accept}) async {
+    _check();
+    calls.add('respond:$fromUid:$accept');
+    requests.removeWhere((r) => r.fromUid == fromUid);
+    _requestsCtl.add(List.of(requests));
+    if (accept) {
+      friendUids.add(fromUid);
+      _friendsCtl.add(List.of(friendUids));
+    }
+  }
+
+  @override
+  Future<void> removeFriend(String friendUid) async {
+    _check();
+    friendUids.remove(friendUid);
+    _friendsCtl.add(List.of(friendUids));
+  }
+
+  @override
+  Stream<Map<String, DateTime>> watchUnlockedAchievements(String uid) => Stream.value(serverBadges);
+
+  @override
+  Future<void> saveDailyWorkout(String uid, String day, List<String> games, List<String> completed) async {
+    _check();
+    calls.add('workout:$day');
+  }
 }

@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../providers/app_providers.dart';
+import '../../providers/cloud_providers.dart';
 
 /// Bottom navigation: Home, Games, Battle, Leaderboard, Profile. Also checks
 /// the daily streak (auto-freeze) on launch and whenever the app resumes.
@@ -35,6 +38,7 @@ class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserv
 
   Future<void> _checkStreak() async {
     final update = await ref.read(progressProvider.notifier).refresh();
+    unawaited(ref.read(syncProvider.notifier).sync());
     if (!mounted || update.frozenDays == 0) return;
     final days = update.frozenDays;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(

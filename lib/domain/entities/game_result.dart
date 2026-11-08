@@ -1,5 +1,8 @@
 import 'game_type.dart';
 
+/// Upload state of a locally stored round.
+enum SyncState { pending, synced, rejected }
+
 /// The outcome of one completed 60-second round.
 class GameResult {
   const GameResult({
@@ -17,7 +20,9 @@ class GameResult {
     required this.playedAt,
     required this.durationSeconds,
     this.isPersonalBest = false,
-    this.synced = false,
+    this.syncState = SyncState.pending,
+    this.ownerUid,
+    this.rejectReason,
   });
 
   final String id;
@@ -37,8 +42,16 @@ class GameResult {
   final int durationSeconds;
   final bool isPersonalBest;
 
-  /// Whether this session has been uploaded to the cloud (used from Phase 3).
-  final bool synced;
+  /// Whether this round has been uploaded and accepted by the server.
+  final SyncState syncState;
+
+  /// The account this round belongs to (local history is per player).
+  final String? ownerUid;
+
+  /// Why the server refused the round (anti-cheat), if it did.
+  final String? rejectReason;
+
+  bool get synced => syncState == SyncState.synced;
 
   int get attempts => correct + wrong;
 
@@ -47,7 +60,13 @@ class GameResult {
 
   int get accuracyPercent => (accuracy * 100).round();
 
-  GameResult copyWith({bool? isPersonalBest, bool? synced}) => GameResult(
+  GameResult copyWith({
+    bool? isPersonalBest,
+    SyncState? syncState,
+    String? ownerUid,
+    String? rejectReason,
+  }) =>
+      GameResult(
         id: id,
         gameType: gameType,
         score: score,
@@ -62,7 +81,9 @@ class GameResult {
         playedAt: playedAt,
         durationSeconds: durationSeconds,
         isPersonalBest: isPersonalBest ?? this.isPersonalBest,
-        synced: synced ?? this.synced,
+        syncState: syncState ?? this.syncState,
+        ownerUid: ownerUid ?? this.ownerUid,
+        rejectReason: rejectReason ?? this.rejectReason,
       );
 
   Map<String, dynamic> toMap() => {
@@ -80,7 +101,24 @@ class GameResult {
         'playedAt': playedAt.toUtc().toIso8601String(),
         'durationSeconds': durationSeconds,
         'isPersonalBest': isPersonalBest,
-        'synced': synced,
+        'syncState': syncState.name,
+        'ownerUid': ownerUid,
+        'rejectReason': rejectReason,
+      };
+
+  /// Payload for the submitGameSession Cloud Function.
+  Map<String, Object?> toSubmitPayload() => {
+        'id': id,
+        'gameId': gameType.id,
+        'score': score,
+        'correct': correct,
+        'wrong': wrong,
+        'maxCombo': maxCombo,
+        'maxLevel': maxLevel,
+        'avgReactionMs': avgReactionMs,
+        'bestReactionMs': bestReactionMs,
+        'playedAt': playedAt.millisecondsSinceEpoch,
+        'durationSeconds': durationSeconds,
       };
 
   /// Returns null for records of games that no longer exist or are corrupt.
@@ -103,7 +141,13 @@ class GameResult {
         playedAt: DateTime.parse(map['playedAt'] as String).toLocal(),
         durationSeconds: (map['durationSeconds'] as num).toInt(),
         isPersonalBest: map['isPersonalBest'] as bool? ?? false,
-        synced: map['synced'] as bool? ?? false,
+        syncState: SyncState.values.firstWhere(
+          (s) => s.name == map['syncState'],
+          // Phase 1/2 records stored a boolean.
+          orElse: () => map['synced'] == true ? SyncState.synced : SyncState.pending,
+        ),
+        ownerUid: map['ownerUid'] as String?,
+        rejectReason: map['rejectReason'] as String?,
       );
     } catch (_) {
       return null;

@@ -13,6 +13,7 @@ import '../../domain/entities/game_result.dart';
 import '../../domain/entities/game_type.dart';
 import '../../domain/logic/rewards.dart';
 import '../providers/app_providers.dart';
+import '../providers/cloud_providers.dart';
 import 'results_args.dart';
 import 'game_session.dart';
 
@@ -170,11 +171,16 @@ class _GameShellState extends ConsumerState<GameShell>
       playedAt: DateTime.now(),
       durationSeconds: widget.roundDuration.inSeconds,
     );
+    final badgesBefore = ref.read(unlockedAchievementsProvider).keys.toSet();
     final levelBefore = ref.read(levelProvider).level;
     final streakBefore = ref.read(streakProvider).current;
     final stored = await ref.read(gameHistoryProvider.notifier).add(result);
     final levelAfter = ref.read(levelProvider).level;
     final streakAfter = ref.read(streakProvider).current;
+    final newBadges = ref
+        .read(achievementCatalogProvider)
+        .where((a) => ref.read(unlockedAchievementsProvider).containsKey(a.id) && !badgesBefore.contains(a.id))
+        .toList();
     // Let the "Time's up" banner register before leaving.
     await Future<void>.delayed(const Duration(milliseconds: 900));
     if (!mounted) return;
@@ -189,6 +195,7 @@ class _GameShellState extends ConsumerState<GameShell>
           justPlayed: true,
           leveledUpTo: levelAfter > levelBefore ? levelAfter : null,
           streakExtendedTo: streakAfter > streakBefore ? streakAfter : null,
+          newBadges: newBadges,
         ),
       );
     }

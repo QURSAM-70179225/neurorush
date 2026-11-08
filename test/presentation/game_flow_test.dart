@@ -96,8 +96,8 @@ void main() {
     expect(find.byType(ResultsScreen), findsOneWidget);
     await scrollTo(tester, find.text('Play again'));
 
-    expect(find.text('Level up! You reached level 2'), findsOneWidget);
-    expect(find.textContaining('-day streak!'), findsOneWidget);
+    expect(find.text('Level up! You reached level 2', skipOffstage: false), findsOneWidget);
+    expect(find.textContaining('-day streak!', skipOffstage: false), findsOneWidget);
 
     expect(history.items, hasLength(2));
     final r = history.items.last;
@@ -248,6 +248,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(history.items.single.correct, 3);
     expect(history.items.single.wrong, 0);
+    expect(find.text('Badge unlocked: First Steps', skipOffstage: false), findsOneWidget);
   });
 
   testWidgets('Path Recall (Flame): tracing the path by tapping cells scores', (tester) async {

@@ -8,10 +8,12 @@ import '../../domain/entities/game_type.dart';
 import '../../presentation/game/results_args.dart';
 import '../../presentation/games/game_play_screen.dart';
 import '../../presentation/providers/app_providers.dart';
+import '../../presentation/screens/achievements/achievements_screen.dart';
 import '../../presentation/screens/auth/auth_screen.dart';
 import '../../presentation/screens/battle/battle_screen.dart';
 import '../../presentation/screens/brain/brain_screen.dart';
 import '../../presentation/screens/brain_test/brain_test_screen.dart';
+import '../../presentation/screens/friends/friends_screen.dart';
 import '../../presentation/screens/games/games_screen.dart';
 import '../../presentation/screens/home/home_screen.dart';
 import '../../presentation/screens/leaderboard/leaderboard_screen.dart';
@@ -51,6 +53,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/upgrade', builder: (_, _) => const AuthScreen(upgrade: true)),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
       GoRoute(path: '/brain', builder: (_, _) => const BrainScreen()),
+      GoRoute(path: '/friends', builder: (_, _) => const FriendsScreen()),
+      GoRoute(path: '/achievements', builder: (_, _) => const AchievementsScreen()),
       GoRoute(path: '/brain-test', builder: (_, _) => const BrainTestScreen()),
       GoRoute(
         path: '/play/:gameId',

@@ -7,16 +7,19 @@ class HiveGameHistoryRepository implements GameHistoryRepository {
   HiveGameHistoryRepository(this._box);
   final Box<dynamic> _box;
 
-  @override
-  List<GameResult> all() {
-    final list = <GameResult>[];
+  Iterable<GameResult> _decoded() sync* {
     for (final v in _box.values) {
       if (v is Map) {
         final r = GameResult.tryFromMap(v);
-        if (r != null) list.add(r);
+        if (r != null) yield r;
       }
     }
-    list.sort((a, b) => b.playedAt.compareTo(a.playedAt));
+  }
+
+  @override
+  List<GameResult> all(String uid) {
+    final list = _decoded().where((r) => r.ownerUid == uid).toList()
+      ..sort((a, b) => b.playedAt.compareTo(a.playedAt));
     return list;
   }
 
@@ -24,5 +27,17 @@ class HiveGameHistoryRepository implements GameHistoryRepository {
   Future<void> save(GameResult result) => _box.put(result.id, result.toMap());
 
   @override
-  Future<void> clear() => _box.clear();
+  Future<void> clear(String uid) async {
+    final ids = _decoded().where((r) => r.ownerUid == uid).map((r) => r.id).toList();
+    await _box.deleteAll(ids);
+  }
+
+  @override
+  Future<int> claimUnowned(String uid) async {
+    final unowned = _decoded().where((r) => r.ownerUid == null).toList();
+    for (final r in unowned) {
+      await _box.put(r.id, r.copyWith(ownerUid: uid).toMap());
+    }
+    return unowned.length;
+  }
 }

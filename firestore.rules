@@ -26,7 +26,7 @@ service cloud.firestore {
       allow delete: if false;
 
       function validClientProfile(d) {
-        return (!('displayName' in d) || (d.displayName is string && d.displayName.size() <= 30))
+        return (!('displayName' in d) || d.displayName == null || (d.displayName is string && d.displayName.size() <= 30))
           && (!('country' in d) || d.country == null || (d.country is string && d.country.matches('^[A-Z]{2}$')))
           && (!('photoUrl' in d) || d.photoUrl == null || (d.photoUrl is string && d.photoUrl.size() <= 500))
           && (!('currentStreak' in d) || (d.currentStreak is int && d.currentStreak >= 0 && d.currentStreak <= 5000))
