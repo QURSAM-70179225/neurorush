@@ -5,10 +5,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../domain/entities/game_result.dart';
 import '../../domain/entities/game_type.dart';
+import '../../presentation/game/results_args.dart';
 import '../../presentation/games/game_play_screen.dart';
 import '../../presentation/providers/app_providers.dart';
 import '../../presentation/screens/auth/auth_screen.dart';
 import '../../presentation/screens/battle/battle_screen.dart';
+import '../../presentation/screens/brain/brain_screen.dart';
+import '../../presentation/screens/brain_test/brain_test_screen.dart';
 import '../../presentation/screens/games/games_screen.dart';
 import '../../presentation/screens/home/home_screen.dart';
 import '../../presentation/screens/leaderboard/leaderboard_screen.dart';
@@ -36,7 +39,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       final user = ref.read(currentUserProvider);
       if (!onboarded) return loc == '/onboarding' ? null : '/onboarding';
       if (user == null) return loc == '/auth' ? null : '/auth';
-      if (loc == '/onboarding' || loc == '/auth') return '/home';
+      // Offer the Brain Test once, right after the first sign-in.
+      final offerTest = !ref.read(settingsProvider).brainTestOffered && !ref.read(progressProvider).brainTestDone;
+      if (loc == '/onboarding' || loc == '/auth') return offerTest ? '/brain-test' : '/home';
       if (loc == '/upgrade' && !user.isGuest) return '/profile';
       return null;
     },
@@ -45,6 +50,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/auth', builder: (_, _) => const AuthScreen()),
       GoRoute(path: '/upgrade', builder: (_, _) => const AuthScreen(upgrade: true)),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
+      GoRoute(path: '/brain', builder: (_, _) => const BrainScreen()),
+      GoRoute(path: '/brain-test', builder: (_, _) => const BrainTestScreen()),
       GoRoute(
         path: '/play/:gameId',
         redirect: (_, s) => GameType.fromId(s.pathParameters['gameId']!) == null ? '/games' : null,
@@ -56,8 +63,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/results',
-        redirect: (_, s) => s.extra is GameResult ? null : '/home',
-        builder: (_, s) => ResultsScreen(result: s.extra! as GameResult),
+        redirect: (_, s) => s.extra is GameResult || s.extra is ResultsArgs ? null : '/home',
+        builder: (_, s) => ResultsScreen(
+          args: switch (s.extra) {
+            final ResultsArgs a => a,
+            final GameResult r => ResultsArgs(result: r),
+            _ => throw StateError('unreachable: guarded by redirect'),
+          },
+        ),
       ),
       StatefulShellRoute.indexedStack(
         builder: (_, _, shell) => MainShell(navigationShell: shell),

@@ -13,6 +13,7 @@ import '../../domain/entities/game_result.dart';
 import '../../domain/entities/game_type.dart';
 import '../../domain/logic/rewards.dart';
 import '../providers/app_providers.dart';
+import 'results_args.dart';
 import 'game_session.dart';
 
 enum _Phase { intro, countdown, playing, paused, finished }
@@ -26,12 +27,24 @@ class GameShell extends ConsumerStatefulWidget {
     required this.builder,
     this.seed,
     this.roundDuration = const Duration(seconds: GameType.roundSeconds),
+    this.introExtra,
+    this.introTitle,
+    this.onFinished,
   });
 
   final GameType type;
   final Widget Function(BuildContext context, GameSession session) builder;
   final int? seed;
   final Duration roundDuration;
+
+  /// Optional widget shown on the intro card (e.g. a language picker).
+  final Widget? introExtra;
+
+  /// Optional heading above the game title on the intro card.
+  final String? introTitle;
+
+  /// When set, called with the saved result instead of opening /results.
+  final void Function(GameResult result)? onFinished;
 
   @override
   ConsumerState<GameShell> createState() => _GameShellState();
@@ -157,10 +170,28 @@ class _GameShellState extends ConsumerState<GameShell>
       playedAt: DateTime.now(),
       durationSeconds: widget.roundDuration.inSeconds,
     );
+    final levelBefore = ref.read(levelProvider).level;
+    final streakBefore = ref.read(streakProvider).current;
     final stored = await ref.read(gameHistoryProvider.notifier).add(result);
+    final levelAfter = ref.read(levelProvider).level;
+    final streakAfter = ref.read(streakProvider).current;
     // Let the "Time's up" banner register before leaving.
     await Future<void>.delayed(const Duration(milliseconds: 900));
-    if (mounted) context.pushReplacement('/results', extra: stored);
+    if (!mounted) return;
+    final onFinished = widget.onFinished;
+    if (onFinished != null) {
+      onFinished(stored);
+    } else {
+      context.pushReplacement(
+        '/results',
+        extra: ResultsArgs(
+          result: stored,
+          justPlayed: true,
+          leveledUpTo: levelAfter > levelBefore ? levelAfter : null,
+          streakExtendedTo: streakAfter > streakBefore ? streakAfter : null,
+        ),
+      );
+    }
   }
 
   Future<void> _confirmQuit() async {
@@ -226,7 +257,14 @@ class _GameShellState extends ConsumerState<GameShell>
               ),
             ),
             if (_phase == _Phase.intro)
-              _IntroOverlay(type: widget.type, gradient: gradient, onStart: _startCountdown),
+              _IntroOverlay(
+                type: widget.type,
+                gradient: gradient,
+                onStart: _startCountdown,
+                extra: widget.introExtra,
+                heading: widget.introTitle,
+                seconds: widget.roundDuration.inSeconds,
+              ),
             if (_phase == _Phase.countdown && _countdownLabel != null)
               _CountdownOverlay(label: _countdownLabel!),
             if (_phase == _Phase.paused)
@@ -417,10 +455,20 @@ class _Chip extends StatelessWidget {
 }
 
 class _IntroOverlay extends StatelessWidget {
-  const _IntroOverlay({required this.type, required this.gradient, required this.onStart});
+  const _IntroOverlay({
+    required this.type,
+    required this.gradient,
+    required this.onStart,
+    required this.seconds,
+    this.extra,
+    this.heading,
+  });
   final GameType type;
   final Gradient gradient;
   final VoidCallback onStart;
+  final int seconds;
+  final Widget? extra;
+  final String? heading;
 
   @override
   Widget build(BuildContext context) {
@@ -436,6 +484,10 @@ class _IntroOverlay extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (heading != null) ...[
+                    Text(heading!, style: theme.textTheme.labelLarge),
+                    const SizedBox(height: 12),
+                  ],
                   Container(
                     width: 72,
                     height: 72,
@@ -450,8 +502,9 @@ class _IntroOverlay extends StatelessWidget {
                   const SizedBox(height: 12),
                   Text(type.howToPlay, textAlign: TextAlign.center, style: theme.textTheme.bodyLarge),
                   const SizedBox(height: 8),
-                  Text('${GameType.roundSeconds} seconds · gets harder as you improve',
+                  Text('$seconds seconds · gets harder as you improve',
                       textAlign: TextAlign.center, style: theme.textTheme.bodySmall),
+                  if (extra != null) ...[const SizedBox(height: 16), extra!],
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,

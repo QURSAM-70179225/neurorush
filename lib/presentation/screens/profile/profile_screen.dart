@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_palette.dart';
 import '../../../domain/entities/user_profile.dart';
 import '../../providers/app_providers.dart';
+import '../../widgets/brain_widgets.dart';
 import '../../widgets/common.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -35,6 +36,10 @@ class ProfileScreen extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final stats = ref.watch(playerStatsProvider);
     final cloud = ref.watch(authRepositoryProvider).supportsCloudAccounts;
+    final level = ref.watch(levelProvider);
+    final streak = ref.watch(streakProvider);
+    final freezes = ref.watch(progressProvider).freezes;
+    final brain = ref.watch(brainScoreProvider);
     final theme = Theme.of(context);
     if (user == null) return const Scaffold(body: SizedBox.shrink());
 
@@ -96,6 +101,27 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
           ],
+          const SizedBox(height: 16),
+          Card(child: Padding(padding: const EdgeInsets.all(14), child: LevelBar(info: level))),
+          const SizedBox(height: 10),
+          StatGrid(children: [
+            StatTile(
+              icon: Icons.local_fire_department_rounded,
+              label: 'Day streak · best ${streak.best}',
+              value: '${streak.current}',
+              color: AppPalette.flame,
+            ),
+            StatTile(icon: Icons.ac_unit_rounded, label: 'Streak freezes', value: '$freezes', color: AppPalette.cyan),
+          ]),
+          SectionHeader('Brain Score: ${brain.total}',
+              trailing: TextButton(onPressed: () => context.push('/brain'), child: const Text('Details'))),
+          Card(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(22),
+              onTap: () => context.push('/brain'),
+              child: Padding(padding: const EdgeInsets.all(12), child: SkillRadarChart(score: brain, size: 240)),
+            ),
+          ),
           const SectionHeader('Your stats'),
           StatGrid(
                   children: [

@@ -43,12 +43,37 @@ class AppPalette {
             colors: [Color(0xFF06B6D4), Color(0xFF2563EB)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight),
+        GameType.shapeMatch => const LinearGradient(
+            colors: [Color(0xFF14B8A6), Color(0xFF0EA5E9)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight),
+        GameType.numberSequence => const LinearGradient(
+            colors: [Color(0xFFF59E0B), Color(0xFFEA580C)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight),
+        GameType.wordScramble => const LinearGradient(
+            colors: [Color(0xFF10B981), Color(0xFF059669)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight),
+        GameType.oddOneOut => const LinearGradient(
+            colors: [Color(0xFFEC4899), Color(0xFF8B5CF6)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight),
+        GameType.pathRecall => const LinearGradient(
+            colors: [Color(0xFF6366F1), Color(0xFF0EA5E9)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight),
       };
 
   static IconData gameIcon(GameType type) => switch (type) {
         GameType.memoryGrid => Icons.grid_view_rounded,
         GameType.colorClash => Icons.palette_rounded,
         GameType.speedMath => Icons.calculate_rounded,
+        GameType.shapeMatch => Icons.category_rounded,
+        GameType.numberSequence => Icons.pin_rounded,
+        GameType.wordScramble => Icons.abc_rounded,
+        GameType.oddOneOut => Icons.search_rounded,
+        GameType.pathRecall => Icons.route_rounded,
       };
 
   static Color skillColor(Skill s) => switch (s) {

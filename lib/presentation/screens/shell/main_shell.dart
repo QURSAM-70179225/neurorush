@@ -1,19 +1,55 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-/// Bottom navigation: Home, Games, Battle, Leaderboard, Profile.
-class MainShell extends StatelessWidget {
+import '../../providers/app_providers.dart';
+
+/// Bottom navigation: Home, Games, Battle, Leaderboard, Profile. Also checks
+/// the daily streak (auto-freeze) on launch and whenever the app resumes.
+class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key, required this.navigationShell});
   final StatefulNavigationShell navigationShell;
 
   @override
+  ConsumerState<MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkStreak());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _checkStreak();
+  }
+
+  Future<void> _checkStreak() async {
+    final update = await ref.read(progressProvider.notifier).refresh();
+    if (!mounted || update.frozenDays == 0) return;
+    final days = update.frozenDays;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('🧊 Streak saved! $days streak freeze${days == 1 ? ' was' : 's were'} used for missed days.'),
+    ));
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final shell = widget.navigationShell;
     return Scaffold(
-      body: navigationShell,
+      body: shell,
       bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: (i) =>
-            navigationShell.goBranch(i, initialLocation: i == navigationShell.currentIndex),
+        selectedIndex: shell.currentIndex,
+        onDestinationSelected: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'Home'),
           NavigationDestination(

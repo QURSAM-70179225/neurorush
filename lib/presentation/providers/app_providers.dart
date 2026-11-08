@@ -3,13 +3,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/feedback/feedback_service.dart';
 import '../../data/local/hive_store.dart';
 import '../../data/repositories/hive_game_history_repository.dart';
+import '../../data/repositories/hive_progress_repository.dart';
 import '../../data/repositories/hive_settings_repository.dart';
 import '../../domain/entities/app_settings.dart';
 import '../../domain/entities/game_result.dart';
+import '../../domain/entities/progress_state.dart';
 import '../../domain/entities/user_profile.dart';
+import '../../domain/logic/brain_score.dart';
+import '../../domain/logic/daily_workout.dart';
 import '../../domain/logic/player_stats.dart';
+import '../../domain/logic/streak_logic.dart';
+import '../../domain/logic/xp_levels.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/repositories/game_history_repository.dart';
+import '../../domain/repositories/progress_repository.dart';
 import '../../domain/repositories/settings_repository.dart';
 
 /// Overridden in main() once Hive is open.
@@ -32,6 +39,13 @@ final settingsRepositoryProvider = Provider<SettingsRepository>(
 final gameHistoryRepositoryProvider = Provider<GameHistoryRepository>(
   (ref) => HiveGameHistoryRepository(ref.watch(hiveStoreProvider).sessions),
 );
+
+final progressRepositoryProvider = Provider<ProgressRepository>(
+  (ref) => HiveProgressRepository(ref.watch(hiveStoreProvider).progress),
+);
+
+/// Overridable clock so streak logic can be tested.
+final clockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
 
 class SettingsNotifier extends Notifier<AppSettings> {
   @override
@@ -81,6 +95,7 @@ class GameHistoryNotifier extends Notifier<List<GameResult>> {
     final stored = result.copyWith(isPersonalBest: result.score > 0 && result.score > previousBest);
     await ref.read(gameHistoryRepositoryProvider).save(stored);
     state = [stored, ...state];
+    await ref.read(progressProvider.notifier).refresh();
     return stored;
   }
 
@@ -95,4 +110,86 @@ final gameHistoryProvider =
 
 final playerStatsProvider = Provider<PlayerStats>(
   (ref) => PlayerStats.fromHistory(ref.watch(gameHistoryProvider)),
+);
+
+/// What changed in the streak during [ProgressNotifier.refresh].
+class StreakUpdate {
+  const StreakUpdate({this.frozenDays = 0, this.freezeEarned = false});
+  final int frozenDays;
+  final bool freezeEarned;
+  bool get isEmpty => frozenDays == 0 && !freezeEarned;
+}
+
+class ProgressNotifier extends Notifier<ProgressState> {
+  @override
+  ProgressState build() => ref.watch(progressRepositoryProvider).load();
+
+  Set<DateTime> _playedDays() => ref.read(gameHistoryProvider).map((r) => dayOf(r.playedAt)).toSet();
+
+  /// Spends freezes to cover missed days and awards milestone freezes.
+  /// Call on app start/resume and after each round.
+  Future<StreakUpdate> refresh() async {
+    final now = ref.read(clockProvider)();
+    final played = _playedDays();
+    var s = state;
+    final toFreeze = StreakLogic.daysToFreeze(
+      playedDays: played,
+      frozenDays: s.frozenDays,
+      freezesAvailable: s.freezes,
+      today: now,
+    );
+    if (toFreeze.isNotEmpty) {
+      s = s.copyWith(freezes: s.freezes - toFreeze.length, frozenDays: {...s.frozenDays, ...toFreeze});
+    }
+    final status = StreakLogic.compute(playedDays: played, frozenDays: s.frozenDays, today: now);
+    final today = dayOf(now);
+    var earned = false;
+    if (status.playedToday &&
+        StreakLogic.earnsFreeze(status.current) &&
+        !s.freezeAwardDays.contains(today) &&
+        s.freezes < StreakLogic.maxFreezes) {
+      s = s.copyWith(freezes: s.freezes + 1, freezeAwardDays: {...s.freezeAwardDays, today});
+      earned = true;
+    }
+    if (!identical(s, state)) {
+      state = s;
+      await ref.read(progressRepositoryProvider).save(s);
+    }
+    return StreakUpdate(frozenDays: toFreeze.length, freezeEarned: earned);
+  }
+
+  Future<void> addFreezes(int n) async {
+    state = state.copyWith(freezes: (state.freezes + n).clamp(0, StreakLogic.maxFreezes));
+    await ref.read(progressRepositoryProvider).save(state);
+  }
+
+  Future<void> markBrainTestDone() async {
+    state = state.copyWith(brainTestDone: true);
+    await ref.read(progressRepositoryProvider).save(state);
+  }
+
+  Future<void> reset() async {
+    state = const ProgressState();
+    await ref.read(progressRepositoryProvider).save(state);
+  }
+}
+
+final progressProvider = NotifierProvider<ProgressNotifier, ProgressState>(ProgressNotifier.new);
+
+final streakProvider = Provider<StreakStatus>((ref) {
+  final history = ref.watch(gameHistoryProvider);
+  final progress = ref.watch(progressProvider);
+  return StreakLogic.compute(
+    playedDays: history.map((r) => r.playedAt).toSet(),
+    frozenDays: progress.frozenDays,
+    today: ref.watch(clockProvider)(),
+  );
+});
+
+final levelProvider = Provider<LevelInfo>((ref) => XpLevels.fromXp(ref.watch(playerStatsProvider).totalXp));
+
+final brainScoreProvider = Provider<BrainScore>((ref) => BrainScore.fromHistory(ref.watch(gameHistoryProvider)));
+
+final dailyWorkoutProvider = Provider<DailyWorkout>(
+  (ref) => DailyWorkout.build(history: ref.watch(gameHistoryProvider), now: ref.watch(clockProvider)()),
 );

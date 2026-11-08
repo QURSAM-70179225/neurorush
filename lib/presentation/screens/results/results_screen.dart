@@ -5,10 +5,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_palette.dart';
 import '../../../domain/entities/game_result.dart';
+import '../../../domain/logic/xp_levels.dart';
+import '../../game/results_args.dart';
 import '../../widgets/common.dart';
 
 class ResultsScreen extends StatefulWidget {
-  const ResultsScreen({super.key, required this.result});
+  ResultsScreen({super.key, required this.args}) : result = args.result;
+  final ResultsArgs args;
   final GameResult result;
 
   @override
@@ -23,7 +26,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
   void initState() {
     super.initState();
     final r = widget.result;
-    final celebrate = r.stars == 3 || r.isPersonalBest;
+    final celebrate = widget.args.justPlayed && (r.stars == 3 || r.isPersonalBest || widget.args.leveledUpTo != null);
     final reduceMotion = WidgetsBinding.instance.platformDispatcher.accessibilityFeatures.disableAnimations;
     if (celebrate && !reduceMotion) {
       Future<void>.delayed(const Duration(milliseconds: 900), () {
@@ -40,7 +43,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
   String get _headline {
     final r = widget.result;
-    if (r.isPersonalBest) return 'New personal best!';
+    if (r.isPersonalBest && widget.args.justPlayed) return 'New personal best!';
     return switch (r.stars) {
       3 => 'Brilliant!',
       2 => 'Great job!',
@@ -126,6 +129,20 @@ class _ResultsScreenState extends State<ResultsScreen> {
                     ],
                   ),
                 ),
+                if (widget.args.leveledUpTo case final lvl?)
+                  _Banner(
+                    icon: Icons.military_tech_rounded,
+                    color: const Color(0xFF7C3AED),
+                    title: 'Level up! You reached level $lvl',
+                    subtitle: XpLevels.titleFor(lvl),
+                  ).animate(delay: 1300.ms).fadeIn().slideY(begin: 0.3),
+                if (widget.args.streakExtendedTo case final days?)
+                  _Banner(
+                    icon: Icons.local_fire_department_rounded,
+                    color: AppPalette.flame,
+                    title: '$days-day streak!',
+                    subtitle: days == 1 ? 'Come back tomorrow to keep it going.' : 'Keep the flame alive tomorrow.',
+                  ).animate(delay: 1500.ms).fadeIn().slideY(begin: 0.3),
                 const SizedBox(height: 16),
                 StatGrid(
                   children: [
@@ -180,4 +197,43 @@ class _ResultsScreenState extends State<ResultsScreen> {
       ),
     );
   }
+}
+
+class _Banner extends StatelessWidget {
+  const _Banner({required this.icon, required this.color, required this.title, required this.subtitle});
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Semantics(
+          liveRegion: true,
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: color.withValues(alpha: 0.5)),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: color, size: 34),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: Theme.of(context).textTheme.titleMedium),
+                      Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
 }

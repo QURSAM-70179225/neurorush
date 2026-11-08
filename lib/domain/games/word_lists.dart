@@ -1,0 +1,60 @@
+/// Curated word lists for Word Scramble. Urdu words are written without
+/// diacritics (zabar, zer, pesh) so every letter is one tile.
+class WordLists {
+  const WordLists._();
+
+  static const english = <String>[
+    'airplane', 'alphabet', 'animal', 'apple', 'baby', 'backpack', 'balloon', 'baseball',
+    'basket', 'bell', 'bicycle', 'bird', 'birthday', 'biscuit', 'blanket', 'blue', 'book',
+    'bottle', 'brain', 'brains', 'bread', 'bridge', 'building', 'butter', 'cabbage', 'cake',
+    'calendar', 'camel', 'camera', 'candle', 'candy', 'captain', 'carpet', 'cartoon', 'castle',
+    'chair', 'champion', 'cheese', 'chess', 'chicken', 'children', 'circle', 'city', 'clean',
+    'clever', 'climate', 'clock', 'cloud', 'coffee', 'coin', 'cold', 'compass', 'computer',
+    'cookie', 'country', 'cricket', 'crystal', 'dance', 'dark', 'daughter', 'desert', 'desk',
+    'diamond', 'dinner', 'dinosaur', 'doctor', 'dolphin', 'door', 'dragon', 'dream', 'drink',
+    'earth', 'effort', 'elephant', 'engine', 'face', 'family', 'fantasy', 'farm', 'feather',
+    'field', 'film', 'finger', 'fire', 'fish', 'flame', 'flower', 'focus', 'foot', 'football',
+    'forest', 'fountain', 'freedom', 'friend', 'fruit', 'gallery', 'game', 'garden', 'genius',
+    'gift', 'giggling', 'ginger', 'giraffe', 'glass', 'gold', 'grape', 'green', 'guitar',
+    'hair', 'hammer', 'hand', 'happy', 'harmony', 'heart', 'help', 'hill', 'history', 'holiday',
+    'home', 'homework', 'horse', 'hospital', 'house', 'idea', 'internet', 'island', 'jacket',
+    'journey', 'juice', 'jump', 'jungle', 'keyboard', 'king', 'kingdom', 'kitchen', 'kite',
+    'kitten', 'ladder', 'lake', 'lamp', 'language', 'lantern', 'laugh', 'leaf', 'lemon',
+    'letter', 'library', 'light', 'lion', 'lizard', 'logic', 'love', 'machine', 'magic',
+    'market', 'memory', 'metal', 'milk', 'mind', 'mirror', 'mission', 'money', 'monkey',
+    'monster', 'moon', 'morning', 'mountain', 'mouse', 'music', 'musician', 'mystery',
+    'natural', 'network', 'night', 'north', 'nose', 'note', 'notebook', 'number', 'ocean',
+    'octopus', 'open', 'orange', 'painter', 'painting', 'palm', 'paper', 'park', 'parrot',
+    'party', 'pattern', 'peace', 'peaceful', 'pencil', 'penguin', 'pepper', 'phone', 'piano',
+    'picture', 'pillow', 'planet', 'plant', 'play', 'pocket', 'potato', 'puzzle', 'pyramid',
+    'queen', 'question', 'quick', 'quiz', 'rabbit', 'radio', 'rain', 'rainbow', 'read',
+    'reindeer', 'rice', 'river', 'road', 'robot', 'rock', 'rocket', 'salad', 'salt', 'sandwich',
+    'sapphire', 'school', 'science', 'scissors', 'seashell', 'seed', 'shadow', 'sheep', 'ship',
+    'shirt', 'silver', 'singer', 'skeleton', 'smile', 'snake', 'snow', 'snowball', 'solid',
+    'song', 'sound', 'space', 'spider', 'spoon', 'sport', 'spring', 'squirrel', 'star',
+    'station', 'stone', 'storm', 'strategy', 'sugar', 'summer', 'sunny', 'sunrise', 'sunshine',
+    'swim', 'table', 'talk', 'teacher', 'team', 'think', 'thunder', 'tiger', 'time', 'toast',
+    'tomato', 'tool', 'tooth', 'tornado', 'town', 'train', 'travel', 'treasure', 'tree',
+    'triangle', 'truck', 'trumpet', 'turtle', 'umbrella', 'unicorn', 'vacation', 'vampire',
+    'village', 'violin', 'vitamins', 'voice', 'volcano', 'walk', 'warm', 'water', 'wave',
+    'weather', 'whale', 'whisper', 'whistle', 'wildlife', 'wind', 'window', 'winter', 'wish',
+    'wizard', 'wolf', 'word', 'work', 'world', 'write', 'yard', 'year', 'yearbook', 'yellow',
+    'young', 'zebra', 'zero',
+  ];
+
+  static const urdu = <String>[
+    'سیب', 'کیلا', 'دودھ', 'پانی', 'گھر', 'کتاب', 'قلم', 'سورج', 'چاند', 'بادل', 'بارش', 'دریا',
+    'پہاڑ', 'شہر', 'دوست', 'بچہ', 'پھول', 'درخت', 'گاڑی', 'کرسی', 'میز', 'کمرہ', 'دروازہ',
+    'کھڑکی', 'بستر', 'تکیہ', 'کھانا', 'روٹی', 'چاول', 'گوشت', 'مچھلی', 'انڈا', 'چائے', 'شہد',
+    'نمک', 'چینی', 'ہوا', 'مٹی', 'سونا', 'چاندی', 'لوہا', 'رنگ', 'نیلا', 'پیلا', 'سبز', 'لال',
+    'کالا', 'سفید', 'دماغ', 'آنکھ', 'کان', 'ناک', 'ہاتھ', 'پاؤں', 'بال', 'دانت', 'زبان', 'رات',
+    'صبح', 'شام', 'ہفتہ', 'مہینہ', 'سال', 'وقت', 'گھڑی', 'کھیل', 'گیند', 'بلا', 'میدان',
+    'اسکول', 'استاد', 'سبق', 'کاپی', 'بستہ', 'ٹوپی', 'جوتا', 'کپڑا', 'قمیض', 'بازار', 'دکان',
+    'پیسہ', 'ریل', 'جہاز', 'کشتی', 'سڑک', 'باغ', 'جنگل', 'صحرا', 'سمندر', 'ستارہ', 'آسمان',
+    'زمین', 'دنیا', 'شیر', 'ہاتھی', 'گھوڑا', 'اونٹ', 'بکری', 'بلی', 'کتا', 'چوہا', 'طوطا',
+    'مرغی', 'خرگوش', 'بندر', 'ہرن', 'موسم', 'گرمی', 'سردی', 'برف', 'خوشی', 'محبت', 'امید',
+    'خواب', 'سوال', 'جواب', 'علم', 'عقل', 'ذہن', 'یاد', 'سوچ', 'کہانی', 'گانا', 'اخبار',
+    'تصویر', 'کھلونا', 'پتنگ', 'دوستی', 'خاندان', 'والد', 'والدہ', 'بھائی', 'بہن', 'دادا',
+    'نانی',
+  ];
+}

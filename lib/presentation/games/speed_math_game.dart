@@ -7,6 +7,7 @@ import '../../domain/games/speed_math_logic.dart';
 import '../game/game_session.dart';
 import '../game/question_timer_bar.dart';
 import '../providers/app_providers.dart';
+import 'timed_question_mixin.dart';
 
 class SpeedMathGame extends ConsumerStatefulWidget {
   const SpeedMathGame({super.key, required this.session});
@@ -17,82 +18,45 @@ class SpeedMathGame extends ConsumerStatefulWidget {
 }
 
 class _SpeedMathGameState extends ConsumerState<SpeedMathGame>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _qTimer;
+    with SingleTickerProviderStateMixin, TimedQuestionMixin {
   MathQuestion? _q;
   int _qId = 0;
   int? _picked;
-  bool _locked = false;
-  final Stopwatch _watch = Stopwatch();
-
-  GameSession get _s => widget.session;
 
   @override
-  void initState() {
-    super.initState();
-    _qTimer = AnimationController(vsync: this, animationBehavior: AnimationBehavior.preserve)
-      ..addStatusListener((st) {
-        if (st == AnimationStatus.completed && !_locked) _answer(null);
-      });
-    _s.running.addListener(_onRunningChanged);
-  }
+  GameSession get session => widget.session;
 
   @override
-  void dispose() {
-    _s.running.removeListener(_onRunningChanged);
-    _qTimer.dispose();
-    super.dispose();
-  }
-
-  void _onRunningChanged() {
-    if (_s.isRunning) {
-      if (_q == null) {
-        _next();
-      } else if (!_locked) {
-        _watch.start();
-        _qTimer.forward();
-      }
-    } else {
-      _watch.stop();
-      _qTimer.stop();
-    }
-  }
-
-  void _next() {
-    final q = SpeedMathLogic.generate(_s.random, _s.level);
+  void nextQuestion() {
+    final q = SpeedMathLogic.generate(session.random, session.level);
     setState(() {
       _q = q;
       _qId++;
       _picked = null;
-      _locked = false;
     });
-    _qTimer
-      ..duration = Duration(milliseconds: q.timeLimitMs)
-      ..forward(from: 0);
-    _watch
-      ..reset()
-      ..start();
+    startQuestion(q.timeLimitMs);
   }
 
-  Future<void> _answer(int? value) async {
+  @override
+  void onTimeout() => _answer(null);
+
+  void _answer(int? value) {
     final q = _q;
-    if (q == null || _locked || !_s.isRunning) return;
-    _locked = true;
-    _qTimer.stop();
-    final ms = _watch.elapsedMilliseconds;
+    if (q == null) return;
+    final ms = lockAnswer();
+    if (ms == null) return;
     final correct = value == q.answer;
     if (correct) {
-      _s.registerCorrect(
-        basePoints: SpeedMathLogic.basePoints(_s.level),
+      session.registerCorrect(
+        basePoints: SpeedMathLogic.basePoints(session.level),
         reactionMs: ms,
         fast: ms < SpeedMathLogic.fastMs,
       );
     } else {
-      _s.registerWrong(reactionMs: value == null ? null : ms);
+      session.registerWrong(reactionMs: value == null ? null : ms);
     }
     setState(() => _picked = value ?? -1);
-    await Future<void>.delayed(Duration(milliseconds: correct ? 200 : 700));
-    if (mounted && _s.isRunning) _next();
+    advanceAfter(correct ? 200 : 700);
   }
 
   @override
@@ -103,7 +67,7 @@ class _SpeedMathGameState extends ConsumerState<SpeedMathGame>
 
     return Column(
       children: [
-        QuestionTimerBar(controller: _qTimer, color: AppPalette.cyan),
+        QuestionTimerBar(controller: questionTimer, color: AppPalette.cyan),
         Expanded(
           child: Center(
             child: q == null

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:neurorush/app.dart';
 import 'package:neurorush/domain/entities/app_settings.dart';
+import 'package:neurorush/domain/entities/game_type.dart';
 import 'package:neurorush/domain/entities/user_profile.dart';
 
 import '../helpers.dart';
@@ -31,14 +32,24 @@ void main() {
     await tester.tap(find.text('Play as guest'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Quick play'), findsOneWidget);
+    // The Brain Test is offered once after the first sign-in.
+    expect(find.text('Start Brain Test'), findsOneWidget);
+    await tester.tap(find.text('Maybe later'));
+    await tester.pumpAndSettle();
+    expect(settings.value.brainTestOffered, isTrue);
+
+    expect(find.text('Take the Brain Test'), findsOneWidget);
+    expect(find.text('Rookie Brain I'), findsOneWidget);
     expect(find.text('Guest'), findsOneWidget);
+    await scrollTo(tester, find.text('Daily Brain Workout'));
+    await scrollTo(tester, find.text('Quick play'));
 
     await tester.tap(find.text('Games'));
     await tester.pumpAndSettle();
-    expect(find.text('Memory Grid'), findsOneWidget);
-    expect(find.text('Color Clash'), findsOneWidget);
-    expect(find.text('Speed Math'), findsOneWidget);
+    for (final t in GameType.values) {
+      await tester.scrollUntilVisible(find.text(t.title), 200, scrollable: find.byType(Scrollable).last);
+      expect(find.text(t.title), findsOneWidget);
+    }
 
     await tester.tap(find.text('Battle'));
     await tester.pumpAndSettle();
@@ -46,13 +57,14 @@ void main() {
 
     await tester.tap(find.text('Leaderboard'));
     await tester.pumpAndSettle();
-    expect(find.text('Not played yet'), findsNWidgets(3));
+    expect(find.text('Not played yet'), findsWidgets);
 
     await tester.tap(find.text('Profile'));
     await tester.pumpAndSettle();
     expect(find.text('Save your progress with a free account.'), findsOneWidget);
 
     // Sign out returns to the auth screen.
+    await tester.scrollUntilVisible(find.text('Sign out'), 300, scrollable: find.byType(Scrollable).last);
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Sign out'));
@@ -64,7 +76,7 @@ void main() {
     usePhoneSize(tester);
     await tester.pumpWidget(ProviderScope(
       overrides: testOverrides(
-        settings: MemorySettingsRepository(const AppSettings(onboardingDone: true)),
+        settings: MemorySettingsRepository(const AppSettings(onboardingDone: true, brainTestOffered: true)),
         auth: FakeAuthRepository(
             user: const UserProfile(uid: 'u', provider: AuthProviderKind.google, displayName: 'Bilal')),
       ),
@@ -72,13 +84,13 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.text('Bilal'), findsOneWidget);
-    expect(find.text('Quick play'), findsOneWidget);
+    await scrollTo(tester, find.text('Quick play'));
   });
 
   testWidgets('email sign-in validates input and shows errors', (tester) async {
     usePhoneSize(tester);
     await tester.pumpWidget(ProviderScope(
-      overrides: testOverrides(settings: MemorySettingsRepository(const AppSettings(onboardingDone: true))),
+      overrides: testOverrides(settings: MemorySettingsRepository(const AppSettings(onboardingDone: true, brainTestOffered: true))),
       child: const NeuroRushApp(),
     ));
     await tester.pumpAndSettle();
@@ -99,13 +111,13 @@ void main() {
     await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'secret1');
     await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await tester.pumpAndSettle();
-    expect(find.text('Quick play'), findsOneWidget);
     expect(find.text('sara'), findsOneWidget);
+    expect(find.text('Daily Brain Workout'), findsOneWidget);
   });
 
   testWidgets('settings: dark mode and large text are saved', (tester) async {
     usePhoneSize(tester);
-    final settings = MemorySettingsRepository(const AppSettings(onboardingDone: true));
+    final settings = MemorySettingsRepository(const AppSettings(onboardingDone: true, brainTestOffered: true));
     await tester.pumpWidget(ProviderScope(
       overrides: testOverrides(
         settings: settings,
@@ -116,7 +128,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Profile'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Settings & accessibility'));
+    await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Dark'));
@@ -124,9 +136,10 @@ void main() {
     expect(settings.value.themeMode, AppThemeMode.dark);
     expect(Theme.of(tester.element(find.text('Dark'))).brightness, Brightness.dark);
 
+    await scrollTo(tester, find.text('Large text'));
     await tester.tap(find.text('Large text'));
     await tester.pumpAndSettle();
     expect(settings.value.largeText, isTrue);
-    expect(MediaQuery.of(tester.element(find.text('Large text'))).textScaler.scale(10), 12.5);
+    expect(MediaQuery.of(tester.element(find.byType(Scaffold).last)).textScaler.scale(10), 12.5);
   });
 }

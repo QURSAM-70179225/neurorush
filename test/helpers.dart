@@ -6,9 +6,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:neurorush/core/feedback/feedback_service.dart';
 import 'package:neurorush/domain/entities/app_settings.dart';
 import 'package:neurorush/domain/entities/game_result.dart';
+import 'package:neurorush/domain/entities/game_type.dart';
+import 'package:neurorush/domain/entities/progress_state.dart';
 import 'package:neurorush/domain/entities/user_profile.dart';
 import 'package:neurorush/domain/repositories/auth_repository.dart';
 import 'package:neurorush/domain/repositories/game_history_repository.dart';
+import 'package:neurorush/domain/repositories/progress_repository.dart';
 import 'package:neurorush/domain/repositories/settings_repository.dart';
 import 'package:neurorush/presentation/providers/app_providers.dart';
 
@@ -94,12 +97,25 @@ class MemoryHistoryRepository implements GameHistoryRepository {
   Future<void> clear() async => items.clear();
 }
 
+class MemoryProgressRepository implements ProgressRepository {
+  MemoryProgressRepository([this.value = const ProgressState()]);
+  ProgressState value;
+  @override
+  ProgressState load() => value;
+  @override
+  Future<void> save(ProgressState state) async => value = state;
+}
+
 List<Override> testOverrides({
   FakeAuthRepository? auth,
   MemorySettingsRepository? settings,
   MemoryHistoryRepository? history,
+  MemoryProgressRepository? progress,
+  DateTime Function()? clock,
 }) =>
     [
+      progressRepositoryProvider.overrideWithValue(progress ?? MemoryProgressRepository()),
+      if (clock != null) clockProvider.overrideWithValue(clock),
       authRepositoryProvider.overrideWithValue(auth ?? FakeAuthRepository()),
       settingsRepositoryProvider.overrideWithValue(settings ?? MemorySettingsRepository()),
       gameHistoryRepositoryProvider.overrideWithValue(history ?? MemoryHistoryRepository()),
@@ -171,3 +187,43 @@ int evaluate(String expr) {
   return parseExpr();
 }
 
+
+/// A finished round for seeding histories in tests.
+GameResult sampleResult({
+  GameType type = GameType.speedMath,
+  int score = 1000,
+  int correct = 8,
+  int wrong = 2,
+  int maxLevel = 4,
+  int xp = 50,
+  int durationSeconds = 60,
+  DateTime? at,
+  String? id,
+}) =>
+    GameResult(
+      id: id ?? '${type.id}-${at?.millisecondsSinceEpoch ?? score}-$xp',
+      gameType: type,
+      score: score,
+      correct: correct,
+      wrong: wrong,
+      maxCombo: 3,
+      maxLevel: maxLevel,
+      avgReactionMs: 800,
+      bestReactionMs: 500,
+      stars: 2,
+      xp: xp,
+      playedAt: at ?? DateTime(2026, 3, 10, 12),
+      durationSeconds: durationSeconds,
+    );
+
+/// Finds a [Semantics] widget by its exact label (works without enabling the
+/// semantics tree).
+Finder semanticsWidget(String label) =>
+    find.byWidgetPredicate((w) => w is Semantics && w.properties.label == label);
+
+/// Scrolls the innermost visible list until [finder] is on screen.
+Future<void> scrollTo(WidgetTester tester, Finder finder) async {
+  await tester.scrollUntilVisible(finder, 250, scrollable: find.byType(Scrollable).last);
+  // Let entrance animations of newly built items finish.
+  await tester.pumpAndSettle();
+}

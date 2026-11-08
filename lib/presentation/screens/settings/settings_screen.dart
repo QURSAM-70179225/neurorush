@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../domain/entities/app_settings.dart';
+import '../../../domain/games/word_scramble_logic.dart';
 import '../../providers/app_providers.dart';
 import '../../widgets/common.dart';
 
@@ -13,7 +14,7 @@ class SettingsScreen extends ConsumerWidget {
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('Reset progress on this device?'),
-        content: const Text('This permanently deletes all saved rounds, scores and XP stored on this device.'),
+        content: const Text('This permanently deletes all saved rounds, scores, XP, streaks and Brain Score stored on this device.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
           FilledButton(
@@ -26,6 +27,7 @@ class SettingsScreen extends ConsumerWidget {
     );
     if (ok != true) return;
     await ref.read(gameHistoryProvider.notifier).clear();
+    await ref.read(progressProvider.notifier).reset();
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Local progress deleted.')));
     }
@@ -52,6 +54,17 @@ class SettingsScreen extends ConsumerWidget {
                 ],
                 selected: {s.themeMode},
                 onSelectionChanged: (v) => n.update((x) => x.copyWith(themeMode: v.first)),
+              ),
+            ),
+          ),
+          const SectionHeader('Word Scramble language'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: SegmentedButton<WordLanguage>(
+                segments: [for (final l in WordLanguage.values) ButtonSegment(value: l, label: Text(l.label))],
+                selected: {s.wordLanguage},
+                onSelectionChanged: (v) => n.update((x) => x.copyWith(wordLanguage: v.first)),
               ),
             ),
           ),
