@@ -11,10 +11,10 @@ Fast, adaptive brain-training mini-games for Android (Flutter + Riverpod + Hive 
 ### Tests
 | Suite | Command | Count |
 |---|---|---|
-| Flutter unit + widget (incl. accessibility guidelines) | `flutter test` | 149 |
-| Cloud Functions unit | `cd functions && npm test` | 66 |
+| Flutter unit + widget (incl. accessibility guidelines) | `flutter test` | 151 |
+| Cloud Functions unit | `cd functions && npm test` | 69 |
 | Firestore security rules (emulator) | `npm run test:rules` | 21 |
-| End-to-end callables on Auth/Firestore/Functions/Pub/Sub emulators | `npm run test:emulators` | 16 |
+| End-to-end callables on Auth/Firestore/Functions/Pub/Sub emulators | `npm run test:emulators` | 17 |
 | Live AI prompts against Groq | `npm run smoke:groq` | manual |
 
 ## Status: all 7 phases complete
