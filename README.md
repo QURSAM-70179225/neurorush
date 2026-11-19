@@ -1,8 +1,23 @@
 # NeuroRush
 
-Fast, adaptive brain-training mini-games for Android (Flutter + Riverpod + Hive + Firebase).
+Fast, adaptive brain-training mini-games for Android (Flutter + Riverpod + Hive + Flame + Firebase + Groq).
 
-## Status: Phase 6 complete
+| | |
+|---|---|
+| Setup and release guide | [SETUP.md](SETUP.md) |
+| Store listing, Data safety, rating | [docs/store/](docs/store/) |
+| Screenshots | [docs/store/screenshots/](docs/store/screenshots/), [docs/screenshots/](docs/screenshots/) |
+
+### Tests
+| Suite | Command | Count |
+|---|---|---|
+| Flutter unit + widget (incl. accessibility guidelines) | `flutter test` | 149 |
+| Cloud Functions unit | `cd functions && npm test` | 66 |
+| Firestore security rules (emulator) | `npm run test:rules` | 21 |
+| End-to-end callables on Auth/Firestore/Functions/Pub/Sub emulators | `npm run test:emulators` | 16 |
+| Live AI prompts against Groq | `npm run smoke:groq` | manual |
+
+## Status: all 7 phases complete
 | Phase | Scope | State |
 |---|---|---|
 | 1 | Setup, auth (Google / email / guest + upgrade), navigation, 3 mini-games, local scoring | ✅ |
@@ -11,7 +26,7 @@ Fast, adaptive brain-training mini-games for Android (Flutter + Riverpod + Hive 
 | 4 | AI Brain Coach after the daily workout, Endless Mode with AI-generated, independently verified puzzles (Groq via Cloud Functions only) | ✅ |
 | 5 | Live 1v1 battles (quick match, invite codes, friend challenges, practice bot; server-refereed), push notifications (streak, workout, friend beat your score, requests, challenges) | ✅ |
 | 6 | AdMob (consent, capped interstitials, server-verified rewarded ads), Play Billing (Remove Ads, coins, themes, Pro subscription; server verification, RTDN), coin shop, neon themes, Remote Config, server-side streaks, App Check, privacy policy, account deletion | ✅ |
-| 7 | Analytics/Crashlytics, polish, release build, Play Store assets | next |
+| 7 | Firebase Analytics + Crashlytics, Lottie confetti, automated accessibility checks, app icon, release signing + R8, release AAB (~13.4 MB per device), store listing (EN/UR), Data safety, screenshots, CI | ✅ |
 
 ### Online architecture (Phase 3)
 - **Single source of truth:** the server is the only writer of competitive data (XP, scores, leaderboards, badges, friendships). The client calls Cloud Functions, and `firestore.rules` blocks direct writes.
@@ -65,5 +80,8 @@ firestore.rules, firestore.indexes.json, firebase.json
 flutter pub get
 flutter test
 flutter run            # Android device/emulator
+flutter build appbundle --release   # see SETUP.md §9 for the full release command
 ```
+
+Regenerate artwork with `python3 tool/make_branding.py && dart run flutter_launcher_icons` and the confetti with `python3 tool/make_confetti_lottie.py`.
 Without `android/app/google-services.json` the app runs in **offline guest mode**. See [SETUP.md](SETUP.md) to enable accounts.
