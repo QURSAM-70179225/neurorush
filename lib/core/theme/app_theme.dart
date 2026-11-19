@@ -29,13 +29,26 @@ class AppTheme {
     return (t.scaffoldBackgroundColor, t.colorScheme.primary, t.colorScheme.secondary);
   }
 
+  /// Dark-mode accents: lighter tints of the brand colours so text buttons
+  /// and links keep a WCAG AA contrast ratio (≥ 4.5:1) on the dark background.
+  static const _darkViolet = Color(0xFFB3A1FF);
+  static const _darkPink = Color(0xFFFF8AC0);
+
+  /// Text colour with the best contrast on [c].
+  static Color _on(Color c) =>
+      ThemeData.estimateBrightnessForColor(c) == Brightness.dark ? Colors.white : const Color(0xFF1E1B33);
+
   static ThemeData _build(Brightness b, {Color? primary, Color? secondary, Color? background, Color? surfaceColor}) {
     final dark = b == Brightness.dark;
+    final p = primary ?? (dark ? _darkViolet : AppPalette.violet);
+    final sec = secondary ?? (dark ? _darkPink : AppPalette.pink);
     final scheme = ColorScheme.fromSeed(
-      seedColor: primary ?? AppPalette.violet,
+      seedColor: p,
       brightness: b,
-      primary: primary ?? AppPalette.violet,
-      secondary: secondary ?? AppPalette.pink,
+      primary: p,
+      onPrimary: _on(p),
+      secondary: sec,
+      onSecondary: _on(sec),
       tertiary: AppPalette.cyan,
       surface: surfaceColor ?? (dark ? AppPalette.darkSurface : Colors.white),
     );

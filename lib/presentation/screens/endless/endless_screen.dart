@@ -10,6 +10,7 @@ import '../../../domain/repositories/cloud_repository.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/cloud_providers.dart';
 import '../../providers/shop_providers.dart';
+import '../../providers/telemetry_providers.dart';
 import '../../../domain/entities/shop.dart';
 import '../../widgets/cloud_widgets.dart';
 
@@ -203,6 +204,7 @@ class _EndlessScreenState extends ConsumerState<EndlessScreen> with SingleTicker
           onPick: _answer,
           onNext: () {
             if (v!.gameOver) {
+              ref.read(analyticsProvider).endlessRunEnd(v.run);
               setState(() => _phase = _Phase.over);
             } else {
               _load();

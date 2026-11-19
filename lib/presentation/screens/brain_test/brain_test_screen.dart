@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +11,7 @@ import '../../../domain/logic/brain_score.dart';
 import '../../game/game_shell.dart';
 import '../../games/game_play_screen.dart';
 import '../../providers/app_providers.dart';
+import '../../providers/telemetry_providers.dart';
 import '../../widgets/brain_widgets.dart';
 
 /// 2-minute Brain Test: one short round per skill. The rounds are saved like
@@ -45,6 +48,7 @@ class _BrainTestScreenState extends ConsumerState<BrainTestScreen> {
   Future<void> _roundFinished() async {
     if (_step == BrainTestScreen.games.length - 1) {
       await ref.read(progressProvider.notifier).markBrainTestDone();
+      unawaited(ref.read(analyticsProvider).brainTestComplete(ref.read(brainScoreProvider).total));
     }
     if (mounted) setState(() => _step++);
   }

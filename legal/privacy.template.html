@@ -17,6 +17,7 @@
   <li>Social: your friends list and friend requests.</li>
   <li>Device: a push-notification installation ID, your time zone (to send reminders at the right local time), and your notification preferences.</li>
   <li>Purchases: product, order ID and Google Play purchase token. Payments are handled by Google Play; we never see your card details.</li>
+  <li>Usage and diagnostics: anonymous gameplay events (for example “round finished”, score, game) and crash reports with device model and OS version, to improve the game and fix bugs.</li>
   <li>Ads: if you allow it, Google AdMob may use your device advertising ID to show ads. You can change this choice in Settings → Ad privacy choices.</li>
 </ul>
 <h2>How we use it</h2>
@@ -31,7 +32,7 @@
 <p>The Brain Coach and Endless Mode use Groq to generate tips and puzzles. We send only game numbers (scores, accuracy, skill levels) and puzzle text — never your name, email or other identifiers.</p>
 <h2>Who we share data with</h2>
 <ul>
-  <li>Google Firebase (hosting, sign-in, database, cloud functions, notifications, remote configuration, App Check).</li>
+  <li>Google Firebase (hosting, sign-in, database, cloud functions, notifications, remote configuration, App Check, Analytics, Crashlytics).</li>
   <li>Google AdMob (ads) and Google Play (payments).</li>
   <li>Groq (AI text generation, as described above).</li>
   <li>Other players see your username, display name, country, level, streak, Brain Score and battle results.</li>

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -13,7 +12,9 @@ import '../../../domain/games/color_clash_logic.dart';
 import '../../../domain/repositories/cloud_repository.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/battle_providers.dart';
+import '../../providers/telemetry_providers.dart';
 import '../../widgets/cloud_widgets.dart';
+import '../../widgets/confetti_burst.dart';
 
 /// A live 1v1 battle. Questions change on the server's schedule; each answer
 /// is checked and timed by the server; scores update through the battle doc.
@@ -30,7 +31,7 @@ class _LiveBattleScreenState extends ConsumerState<LiveBattleScreen> {
   final Map<int, AnswerResult?> _mine = {}; // null = submitting
   int _lastIndex = -2;
   bool _finishing = false;
-  late final ConfettiController _confetti = ConfettiController(duration: const Duration(seconds: 2));
+  final _confetti = GlobalKey<ConfettiBurstState>();
   bool _celebrated = false;
 
   @override
@@ -44,7 +45,6 @@ class _LiveBattleScreenState extends ConsumerState<LiveBattleScreen> {
   @override
   void dispose() {
     _ticker?.cancel();
-    _confetti.dispose();
     super.dispose();
   }
 
@@ -121,10 +121,13 @@ class _LiveBattleScreenState extends ConsumerState<LiveBattleScreen> {
       body = const Center(child: InfoState(icon: Icons.timer_off_rounded, message: 'This invite expired.'));
     } else if (b.status == BattleStatus.finished) {
       final s = BattleSummary(battle: b, myUid: uid);
-      if (!_celebrated && s.won) {
+      if (!_celebrated) {
         _celebrated = true;
-        _confetti.play();
-        ref.read(feedbackServiceProvider).finish();
+        ref.read(analyticsProvider).battleEnd(mode: b.mode.name, outcome: s.draw ? 'draw' : (s.won ? 'win' : 'loss'));
+        if (s.won) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _confetti.currentState?.play());
+          ref.read(feedbackServiceProvider).finish();
+        }
       }
       body = _Result(summary: s);
     } else {
@@ -167,10 +170,7 @@ class _LiveBattleScreenState extends ConsumerState<LiveBattleScreen> {
         body: Stack(
           children: [
             SafeArea(child: Padding(padding: const EdgeInsets.all(16), child: body)),
-            Align(
-              alignment: Alignment.topCenter,
-              child: ConfettiWidget(confettiController: _confetti, blastDirectionality: BlastDirectionality.explosive),
-            ),
+            Positioned.fill(child: ConfettiBurst(key: _confetti)),
           ],
         ),
       ),

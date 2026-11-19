@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -20,6 +22,7 @@ import 'core/billing/billing_service.dart';
 import 'core/config/remote_config_service.dart';
 import 'core/feedback/feedback_service.dart';
 import 'core/push/push_service.dart';
+import 'core/telemetry/telemetry.dart';
 import 'data/local/hive_store.dart';
 import 'data/repositories/firebase_auth_repository.dart';
 import 'data/repositories/firebase_battle_repository.dart';
@@ -39,6 +42,7 @@ import 'presentation/providers/app_providers.dart';
 import 'presentation/providers/battle_providers.dart';
 import 'presentation/providers/cloud_providers.dart';
 import 'presentation/providers/shop_providers.dart';
+import 'presentation/providers/telemetry_providers.dart';
 
 /// `flutter run --dart-define=USE_EMULATORS=true` talks to local Firebase
 /// emulators (see SETUP.md). 10.0.2.2 is the host machine from an Android emulator.
@@ -71,6 +75,7 @@ Future<void> main() async {
         appConfigProvider.overrideWithValue(b.config),
         adsServiceProvider.overrideWithValue(b.ads),
         billingServiceProvider.overrideWithValue(b.billing),
+        analyticsProvider.overrideWithValue(b.analytics),
         achievementCatalogProvider.overrideWithValue(catalogue),
         feedbackServiceProvider.overrideWithValue(feedback),
         connectivityRestoredProvider.overrideWithValue(_connectivityRestored()),
@@ -92,6 +97,7 @@ typedef _Backends = ({
   AppConfig config,
   AdsService ads,
   BillingService billing,
+  Analytics analytics,
 });
 
 Future<_Backends> _createBackends(HiveStore store, ServerClock clock) async {
@@ -105,6 +111,7 @@ Future<_Backends> _createBackends(HiveStore store, ServerClock clock) async {
       db.useFirestoreEmulator(_emulatorHost, 8080);
       functions.useFunctionsEmulator(_emulatorHost, 5001);
     }
+    if (!kIsWeb) installCrashReporting(FirebaseCrashlytics.instance);
     // App Check: Play Integrity attests that calls come from the real app.
     await FirebaseAppCheck.instance
         .activate(providerAndroid: kDebugMode ? const AndroidDebugProvider() : const AndroidPlayIntegrityProvider())
@@ -123,6 +130,7 @@ Future<_Backends> _createBackends(HiveStore store, ServerClock clock) async {
       config: config,
       ads: kIsWeb ? const NoopAdsService() : GoogleAdsService(),
       billing: kIsWeb ? const UnavailableBillingService() : PlayBillingService(InAppPurchase.instance),
+      analytics: FirebaseAnalyticsImpl(FirebaseAnalytics.instance),
     );
   } catch (e) {
     debugPrint('Firebase unavailable, running in offline mode: $e');
@@ -136,6 +144,7 @@ Future<_Backends> _createBackends(HiveStore store, ServerClock clock) async {
       // Ads still work offline-first; purchases need the server to verify.
       ads: kIsWeb ? const NoopAdsService() : GoogleAdsService(),
       billing: const UnavailableBillingService(),
+      analytics: const NoopAnalytics(),
     );
   }
 }

@@ -8,6 +8,7 @@ import '../../domain/entities/game_type.dart';
 import '../../presentation/game/results_args.dart';
 import '../../presentation/games/game_play_screen.dart';
 import '../../presentation/providers/app_providers.dart';
+import '../../presentation/providers/telemetry_providers.dart';
 import '../../presentation/screens/achievements/achievements_screen.dart';
 import '../../presentation/screens/auth/auth_screen.dart';
 import '../../presentation/screens/battle/battle_screen.dart';
@@ -32,11 +33,16 @@ final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = ValueNotifier<int>(0);
-  ref.listen(currentUserProvider, (_, _) => refresh.value++);
+  ref.listen(currentUserProvider, (prev, next) {
+    refresh.value++;
+    if (prev?.uid != next?.uid) ref.read(analyticsProvider).setUser(next?.uid);
+  });
   ref.listen(settingsProvider.select((s) => s.onboardingDone), (_, _) => refresh.value++);
 
+  final observer = ref.read(analyticsProvider).observer;
   final router = GoRouter(
     navigatorKey: _rootKey,
+    observers: [?observer],
     initialLocation: '/home',
     refreshListenable: refresh,
     debugLogDiagnostics: kDebugMode,

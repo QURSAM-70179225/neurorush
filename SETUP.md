@@ -1,6 +1,6 @@
 # Setup guide
 
-Covers Phases 1–6: Authentication, Firestore, Cloud Functions, Groq AI, battles, push notifications, AdMob, Google Play Billing, Remote Config, App Check, privacy and account deletion. Phase 7 adds release signing and the store listing.
+Complete setup, from an empty Firebase project to a release on Google Play: Firebase (Auth, Firestore, Functions, Messaging, Remote Config, App Check, Analytics, Crashlytics, Hosting), Groq, AdMob, Play Billing, release signing and the store listing.
 
 ## 1. Tools
 - Flutter stable (built and tested with 3.47.9 / Dart 3.13)
@@ -187,6 +187,65 @@ Create these keys in **two** templates: **Client** (app display and ad frequency
   firebase deploy --only hosting
   ```
   In Play Console → App content, enter `https://<project-id>.web.app/privacy` and `https://<project-id>.web.app/delete-account`.
+
+## 7. Analytics and Crashlytics (Phase 7)
+- **Analytics** is on as soon as `google-services.json` is present. The app logs only gameplay events: `game_end`, `level_up`, `brain_test_complete`, `workout_complete`, `battle_end`, `endless_run_end`, `rewarded_reward`, `purchase_verified`, `share_invite`. It logs no personal data, and screen views come from the router.
+- **Crashlytics** records uncaught Flutter and platform errors in release builds. The Gradle plugin uploads obfuscation mapping files automatically. For Dart symbols, upload them after each release build:
+  ```bash
+  firebase crashlytics:symbols:upload --app=<firebase-android-app-id> build/symbols
+  ```
+- Both are covered in the privacy policy and the Data safety answers (`docs/store/data-safety.md`).
+
+## 8. Release signing
+1. Create the upload key once and keep it safe (back it up; never commit it):
+   ```bash
+   keytool -genkeypair -v -keystore ~/neurorush-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+   ```
+2. Create `android/key.properties`. It's git-ignored:
+   ```
+   storeFile=/home/you/neurorush-upload.jks
+   storePassword=...
+   keyAlias=upload
+   keyPassword=...
+   ```
+   Without this file, release builds are signed with the debug key and can't be uploaded to Play.
+3. In Play Console, enable **Play App Signing**: Google keeps the app signing key, and you upload with this key.
+4. Add the SHA-1 and SHA-256 of **both** keys to the Firebase Android app. You'll find them in Play Console → Setup → App signing, and with `keytool -list -v -keystore ~/neurorush-upload.jks`. Then download `google-services.json` again. Google Sign-In and App Check depend on these fingerprints.
+
+## 9. Build the release App Bundle
+```bash
+flutter build appbundle --release \
+  --obfuscate --split-debug-info=build/symbols \
+  --dart-define=SUPPORT_EMAIL=support@yourdomain.com \
+  --dart-define=PRIVACY_URL=https://<project-id>.web.app/privacy \
+  --dart-define=DELETE_ACCOUNT_URL=https://<project-id>.web.app/delete-account \
+  --dart-define=ADMOB_INTERSTITIAL_ID=ca-app-pub-XXXX/YYYY \
+  --dart-define=ADMOB_REWARDED_ID=ca-app-pub-XXXX/ZZZZ
+```
+The bundle is written to `build/app/outputs/bundle/release/app-release.aab`. Release builds use R8 code shrinking and resource shrinking.
+- **Version:** bump `version:` in `pubspec.yaml` (`1.0.0+1` → `1.0.1+2`) for every upload. The number after `+` must keep increasing.
+- **Size:** measured for 1.0.0: the bundle is 67 MB (every CPU type), and a phone downloads **about 13.4 MB** (arm64: 5.2 MB shared code and resources + 8.2 MB native). Play Console shows the exact per-device numbers after upload. The target is under 40 MB.
+- **CI:** `.github/workflows/ci.yml` builds the same bundle on `main` when these repository secrets are set:
+  - `UPLOAD_KEYSTORE_BASE64`, `UPLOAD_KEYSTORE_PASSWORD`, `UPLOAD_KEY_PASSWORD`
+  - `GOOGLE_SERVICES_JSON_BASE64`, `ADMOB_APP_ID`
+  - the `--dart-define` values above
+
+## 10. Google Play Console checklist
+1. **Create the app:** name "NeuroRush: Brain Training", default language English, Game, Free.
+2. **Store listing:** use the text in `docs/store/listing.md` (check its length with `python3 tool/check_listing.py`). Upload `docs/store/icon-512.png`, `docs/store/feature-graphic.png`, and phone screenshots from `docs/store/screenshots/` (or take your own from a device).
+3. **App content:**
+   - Privacy policy URL.
+   - Ads: **Yes**.
+   - App access: guest mode, so no login is needed.
+   - Target audience: **13+**.
+   - Data safety: `docs/store/data-safety.md`.
+   - Content rating questionnaire: answers in the same file.
+   - Account deletion URL.
+4. **Monetization:** create the products from section 5d, then set up Real-time developer notifications.
+5. **Testing:** upload the AAB to **Internal testing** and add yourself and the license testers. Then check:
+   - Google sign-in, one purchase of each type, a rewarded ad, a battle between two phones, and that push notifications arrive.
+   - The Firebase console for Crashlytics and Analytics events.
+6. **Production:** promote the tested build, starting with a staged rollout (for example 20%).
 
 ### Firestore schema
 

@@ -1,7 +1,15 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Release signing: android/key.properties (git-ignored), see SETUP.md §8.
+val keystoreProperties = Properties().apply {
+    val f = rootProject.file("key.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
 }
 
 android {
@@ -55,6 +63,8 @@ flutter {
 // builds and runs in offline guest mode (see SETUP.md).
 if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
+    // Uploads R8 mapping files so Crashlytics stack traces are readable.
+    apply(plugin = "com.google.firebase.crashlytics")
 } else {
     logger.warn("android/app/google-services.json not found: building without Firebase.")
 }

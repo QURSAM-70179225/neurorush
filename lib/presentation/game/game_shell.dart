@@ -15,6 +15,7 @@ import '../../domain/logic/rewards.dart';
 import '../providers/app_providers.dart';
 import '../providers/cloud_providers.dart';
 import '../providers/shop_providers.dart';
+import '../providers/telemetry_providers.dart';
 import 'results_args.dart';
 import 'game_session.dart';
 
@@ -173,11 +174,22 @@ class _GameShellState extends ConsumerState<GameShell>
       durationSeconds: widget.roundDuration.inSeconds,
     );
     final badgesBefore = ref.read(unlockedAchievementsProvider).keys.toSet();
+    final workoutDoneBefore = ref.read(dailyWorkoutProvider).isComplete;
     final levelBefore = ref.read(levelProvider).level;
     final streakBefore = ref.read(streakProvider).current;
     final stored = await ref.read(gameHistoryProvider.notifier).add(result);
     ref.read(interstitialPolicyProvider).gameFinished();
+    final analytics = ref.read(analyticsProvider);
+    unawaited(analytics.gameEnd(
+      gameId: stored.gameType.id,
+      score: stored.score,
+      stars: stored.stars,
+      accuracyPercent: stored.accuracyPercent,
+      seconds: stored.durationSeconds,
+    ));
+    if (!workoutDoneBefore && ref.read(dailyWorkoutProvider).isComplete) unawaited(analytics.workoutComplete());
     final levelAfter = ref.read(levelProvider).level;
+    if (levelAfter > levelBefore) unawaited(analytics.levelUp(levelAfter));
     final streakAfter = ref.read(streakProvider).current;
     final newBadges = ref
         .read(achievementCatalogProvider)

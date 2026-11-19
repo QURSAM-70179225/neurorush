@@ -43,7 +43,6 @@ dependencies:
   google_sign_in: ^7.2.0
   audioplayers: ^6.8.1
   flutter_animate: ^4.5.2
-  confetti: ^0.8.0
   uuid: ^4.6.0
   intl: ^0.20.3
   flame: ^1.38.2
@@ -59,6 +58,9 @@ dependencies:
   firebase_app_check: ^0.5.1
   crypto: ^3.0.8
   url_launcher: ^6.3.3
+  firebase_analytics: ^13.1.0
+  firebase_crashlytics: ^6.1.0
+  lottie: ^3.8.2
 
 dev_dependencies:
   flutter_test:
@@ -70,6 +72,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -85,6 +88,7 @@ flutter:
   assets:
     - assets/sounds/
     - shared/achievements.json
+    - assets/lottie/confetti.json
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
@@ -111,3 +115,12 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# App icon: `dart run flutter_launcher_icons` (source art: tool/make_branding.py)
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/branding/icon.png
+  adaptive_icon_background: assets/branding/icon_background.png
+  adaptive_icon_foreground: assets/branding/icon_foreground.png
+  min_sdk_android: 24

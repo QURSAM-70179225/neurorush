@@ -14,6 +14,7 @@ import '../../domain/logic/interstitial_policy.dart';
 import '../../domain/repositories/cloud_repository.dart';
 import 'app_providers.dart';
 import 'cloud_providers.dart';
+import 'telemetry_providers.dart';
 
 /// Overridden in main() after Remote Config is fetched.
 final appConfigProvider = Provider<AppConfig>((ref) => const AppConfig());
@@ -77,7 +78,9 @@ Future<RewardClaim?> watchRewardedAd(WidgetRef ref, RewardType type, {String? se
   for (final delay in const [500, 1000, 1500, 2000, 3000, 4000]) {
     await Future<void>.delayed(Duration(milliseconds: delay));
     try {
-      return await cloud.claimAdReward(nonce);
+      final claim = await cloud.claimAdReward(nonce);
+      unawaited(ref.read(analyticsProvider).rewardedReward(type.wire, applied: claim.applied));
+      return claim;
     } on CloudFailure catch (e) {
       if (e.code != 'not-found') rethrow;
     }
@@ -183,6 +186,7 @@ class ShopNotifier extends Notifier<ShopState> {
         try {
           await ref.read(cloudRepositoryProvider).verifyPurchase(u.productId, u.token ?? '');
           await ref.read(billingServiceProvider).complete(u);
+          unawaited(ref.read(analyticsProvider).purchaseVerified(u.productId));
           state = state.copyWith(busy: false, message: 'Thank you! Your purchase is ready.');
         } on CloudUnavailable {
           state = state.copyWith(busy: false, message: 'Purchase received — we’ll confirm it when you’re back online.');

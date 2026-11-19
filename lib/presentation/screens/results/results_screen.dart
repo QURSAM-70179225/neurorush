@@ -1,4 +1,3 @@
-import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +12,7 @@ import '../../providers/app_providers.dart';
 import '../../providers/cloud_providers.dart';
 import '../../providers/shop_providers.dart';
 import '../../widgets/cloud_widgets.dart';
+import '../../widgets/confetti_burst.dart';
 import '../../widgets/achievement_icons.dart';
 import '../../widgets/common.dart';
 
@@ -57,8 +57,7 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
     }
   }
 
-  late final ConfettiController _confetti =
-      ConfettiController(duration: const Duration(milliseconds: 1600));
+  final _confetti = GlobalKey<ConfettiBurstState>();
 
   @override
   void initState() {
@@ -66,19 +65,11 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
     final r = widget.result;
     final celebrate = widget.args.justPlayed &&
         (r.stars == 3 || r.isPersonalBest || widget.args.leveledUpTo != null || widget.args.newBadges.isNotEmpty);
-    final reduceMotion = WidgetsBinding.instance.platformDispatcher.accessibilityFeatures.disableAnimations;
-    if (celebrate && !reduceMotion) {
-      Future<void>.delayed(const Duration(milliseconds: 900), () {
-        if (mounted) _confetti.play();
-      });
+    if (celebrate) {
+      Future<void>.delayed(const Duration(milliseconds: 900), () => _confetti.currentState?.play());
     }
   }
 
-  @override
-  void dispose() {
-    _confetti.dispose();
-    super.dispose();
-  }
 
   String get _headline {
     final r = widget.result;
@@ -237,18 +228,7 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
               ],
             ),
           ),
-          Align(
-            alignment: Alignment.topCenter,
-            child: ConfettiWidget(
-              confettiController: _confetti,
-              blastDirectionality: BlastDirectionality.explosive,
-              numberOfParticles: 30,
-              maxBlastForce: 30,
-              minBlastForce: 10,
-              gravity: 0.25,
-              colors: const [AppPalette.violet, AppPalette.pink, AppPalette.cyan, AppPalette.amber, AppPalette.mint],
-            ),
-          ),
+          Positioned.fill(child: ConfettiBurst(key: _confetti)),
         ],
       ),
     );
