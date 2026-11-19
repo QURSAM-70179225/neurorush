@@ -13,7 +13,11 @@ import { economy } from './config';
 
 /** Set with: firebase functions:secrets:set GROQ_API_KEY */
 export const GROQ_API_KEY = defineSecret('GROQ_API_KEY');
-export const GROQ_MODEL = defineString('GROQ_MODEL', { default: 'llama-3.3-70b-versatile' });
+/**
+ * Groq retired its Llama chat models for new keys; gpt-oss-120b is the
+ * default (verified live). Override per project in functions/.env.<project>.
+ */
+export const GROQ_MODEL = defineString('GROQ_MODEL', { default: 'openai/gpt-oss-120b' });
 export const GROQ_BASE_URL = defineString('GROQ_BASE_URL', { default: 'https://api.groq.com/openai/v1' });
 
 export const ENDLESS_LIVES = 3;

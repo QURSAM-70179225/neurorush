@@ -32,13 +32,7 @@ export class GroqClient implements LlmClient {
           method: 'POST',
           signal: controller.signal,
           headers: { 'content-type': 'application/json', authorization: `Bearer ${this.apiKey}` },
-          body: JSON.stringify({
-            model: this.model,
-            messages,
-            temperature: opts.temperature ?? 0.7,
-            max_tokens: opts.maxTokens ?? 400,
-            response_format: { type: 'json_object' },
-          }),
+          body: JSON.stringify(requestBody(this.model, messages, opts)),
         });
       } catch (e) {
         lastError = new LlmError(`Network error: ${(e as Error).message}`);
@@ -50,7 +44,15 @@ export class GroqClient implements LlmClient {
         lastError = new LlmError(`Groq HTTP ${res.status}`);
         continue;
       }
-      if (!res.ok) throw new LlmError(`Groq HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      if (!res.ok) {
+        const text = await res.text();
+        // The model occasionally produces invalid JSON; that is worth one retry.
+        if (res.status === 400 && text.includes('json_validate_failed')) {
+          lastError = new LlmError('Completion is not valid JSON');
+          continue;
+        }
+        throw new LlmError(`Groq HTTP ${res.status}: ${text.slice(0, 200)}`);
+      }
       try {
         const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
         const parsed = JSON.parse(body.choices?.[0]?.message?.content ?? '') as unknown;
@@ -62,6 +64,28 @@ export class GroqClient implements LlmClient {
     }
     throw lastError;
   }
+}
+
+/** Reasoning models (gpt-oss, qwen3) think before answering. */
+export function isReasoningModel(model: string): boolean {
+  return /gpt-oss|qwen3/i.test(model);
+}
+
+/**
+ * Chat request body. Reasoning models get low reasoning effort and a larger
+ * token budget, because hidden reasoning tokens count towards max_tokens.
+ */
+export function requestBody(model: string, messages: ChatMessage[], opts: { temperature?: number; maxTokens?: number }) {
+  const reasoning = isReasoningModel(model);
+  const maxTokens = opts.maxTokens ?? 400;
+  return {
+    model,
+    messages,
+    temperature: opts.temperature ?? 0.7,
+    max_tokens: reasoning ? Math.max(maxTokens * 4, 2000) : maxTokens,
+    response_format: { type: 'json_object' },
+    ...(reasoning ? { reasoning_effort: /gpt-oss/i.test(model) ? 'low' : 'default', reasoning_format: 'hidden' } : {}),
+  };
 }
 
 /** Collapses whitespace, strips control chars and markup, and caps length. */

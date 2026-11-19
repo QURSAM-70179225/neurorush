@@ -71,13 +71,14 @@ The Groq key lives **only** in Cloud Functions, stored as a Secret Manager secre
 2. Store it as a secret, then check it against the real API:
    ```bash
    firebase functions:secrets:set GROQ_API_KEY     # paste the key when asked
-   cd functions && GROQ_API_KEY=gsk_... npm run smoke:groq
+   cd functions && GROQ_API_KEY=gsk_... NODE_USE_ENV_PROXY=1 npm run smoke:groq   # NODE_USE_ENV_PROXY only behind an HTTP proxy
    ```
    (`functions:secrets:set` replaces the old `functions:config:set`, which is deprecated.)
-3. Optional: choose the model with a parameter. The default is `llama-3.3-70b-versatile`. Put it in `functions/.env.<your-project-id>`:
+3. Optional: choose the model with a parameter. Put it in `functions/.env.<your-project-id>`:
    ```
-   GROQ_MODEL=llama-3.1-8b-instant
+   GROQ_MODEL=openai/gpt-oss-120b
    ```
+   That is the default, and the smoke test passed with it. Groq no longer offers Llama *chat* models to new keys (only Llama prompt-guard classifiers), so the code works with any JSON-capable chat model Groq lists. Reasoning models such as `gpt-oss` and `qwen3` automatically get a larger token budget and `reasoning_effort: low`.
 4. Deploy: `firebase deploy --only functions`.
 
 | Function | Purpose |

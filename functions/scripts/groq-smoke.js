@@ -1,5 +1,5 @@
 // Live check of the AI prompts against Groq (no Firebase needed).
-// Usage: npm run build && GROQ_API_KEY=gsk_... node scripts/groq-smoke.js
+// Usage: npm run build && GROQ_API_KEY=gsk_... [GROQ_MODEL=...] node scripts/groq-smoke.js
 const { GroqClient } = require('../lib/ai/llm');
 const { generateCoachTip } = require('../lib/ai/coach');
 const { generateVerifiedPuzzle } = require('../lib/ai/puzzles');
@@ -7,7 +7,7 @@ const { generateVerifiedPuzzle } = require('../lib/ai/puzzles');
 (async () => {
   const key = process.env.GROQ_API_KEY;
   if (!key) throw new Error('Set GROQ_API_KEY');
-  const llm = new GroqClient(key, process.env.GROQ_MODEL || 'llama-3.3-70b-versatile');
+  const llm = new GroqClient(key, process.env.GROQ_MODEL || 'openai/gpt-oss-120b');
   const tip = await generateCoachTip(llm, {
     sessions: [
       { gameId: 'speed_math', score: 1650, accuracy: 0.88, maxLevel: 6, avgReactionMs: 1250, stars: 2 },

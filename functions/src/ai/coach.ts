@@ -50,6 +50,11 @@ export function coachMessages(input: CoachInput): ChatMessage[] {
       `${s.avgReactionMs === null ? 'no reaction data' : `average reaction ${s.avgReactionMs} ms`}, ${s.stars}/3 stars`;
   });
   const skills = SKILLS.map((s) => `${s} ${input.skills[s]}/200`).join(', ');
+  const weakest = weakestSkill(input.skills);
+  const games = Object.values(GAMES)
+    .filter((g) => g.skill === weakest)
+    .map((g) => GAME_NAMES[g.id])
+    .join(' or ');
   return [
     {
       role: 'system',
@@ -57,15 +62,18 @@ export function coachMessages(input: CoachInput): ChatMessage[] {
         'You are Neo, the upbeat brain coach of NeuroRush, a brain-training game. ' +
         'Reply ONLY with a JSON object: {"tip": string, "funFact": string}. ' +
         '"tip": 1–2 short sentences (max 220 characters) of specific, encouraging advice based on the stats, ' +
-        'mentioning one game or skill to focus on next. No medical claims, no diagnosis. ' +
-        '"funFact": one surprising, scientifically accurate fact about the human brain (max 200 characters). ' +
+        'recommending exactly one of the games named in the message, by its exact name. Never invent game names. ' +
+        'No medical claims, no diagnosis. ' +
+        '"funFact": one surprising, well-established fact about the human brain (max 200 characters). ' +
+        'Only state facts found in neuroscience textbooks; avoid exaggerations. ' +
         'Simple English suitable for teenagers and adults. No emojis, no markdown.',
     },
     {
       role: 'user',
       content:
         `Today's workout:\n${lines.join('\n')}\n` +
-        `Skill scores: ${skills}. Weakest skill: ${weakestSkill(input.skills)}. ` +
+        `Skill scores: ${skills}. Weakest skill: ${weakest}. ` +
+        `Games that train it: ${games}. ` +
         `Current daily streak: ${input.streak} days.`,
     },
   ];

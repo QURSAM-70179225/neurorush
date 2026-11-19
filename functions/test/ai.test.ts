@@ -1,5 +1,5 @@
 import { coachMessages, fallbackCoachTip, generateCoachTip, weakestSkill } from '../src/ai/coach';
-import { ChatMessage, cleanText, GroqClient, LlmClient, LlmError } from '../src/ai/llm';
+import { ChatMessage, cleanText, GroqClient, LlmClient, LlmError, requestBody } from '../src/ai/llm';
 import {
   difficultyForRun, generatedSequencePuzzle, generateVerifiedPuzzle, parsePuzzle, puzzleHash, sequenceIsConsistent,
 } from '../src/ai/puzzles';
@@ -26,8 +26,15 @@ const input = {
 const seq = { question: 'What comes next? 3, 6, 9, 12, 15, ?', choices: ['17', '18', '21', '16'], answerIndex: 1, explanation: 'Add 3 each time.' };
 
 describe('coach', () => {
+  test('reasoning models get low effort and room for hidden reasoning', () => {
+    expect(requestBody('openai/gpt-oss-120b', [], { maxTokens: 300 })).toMatchObject({ max_tokens: 2000, reasoning_effort: 'low', reasoning_format: 'hidden' });
+    expect(requestBody('llama-x', [], { maxTokens: 300 })).not.toHaveProperty('reasoning_effort');
+    expect(requestBody('llama-x', [], { maxTokens: 300 }).max_tokens).toBe(300);
+  });
+
   test('prompt contains only stats, the weakest skill and fixed names', () => {
     const m = coachMessages(input);
+    expect(m[1].content).toContain('Games that train it: Number Sequence.');
     expect(m[1].content).toContain('Speed Math (speed skill): score 1500, accuracy 85%');
     expect(m[1].content).toContain('Weakest skill: logic');
     expect(weakestSkill(skills)).toBe('logic');
@@ -155,6 +162,10 @@ describe('GroqClient', () => {
     expect(await new GroqClient('k', 'm', url).json([])).toEqual({ b: 2 });
     replies.push({ status: 200, body: { choices: [{ message: { content: 'not json' } }] } }, ok({ c: 3 }));
     expect(await new GroqClient('k', 'm', url).json([])).toEqual({ c: 3 });
+  });
+  test('retries once when Groq reports invalid JSON', async () => {
+    replies.push({ status: 400, body: { error: { code: 'json_validate_failed' } } }, ok({ d: 4 }));
+    expect(await new GroqClient('k', 'm', url).json([])).toEqual({ d: 4 });
   });
   test('fails fast on 401 and after two server errors', async () => {
     replies.push({ status: 401, body: { error: 'bad key' } });
