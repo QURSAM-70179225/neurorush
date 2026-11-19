@@ -9,6 +9,7 @@ class ResultsArgs {
     this.leveledUpTo,
     this.streakExtendedTo,
     this.newBadges = const [],
+    this.coinsBefore,
   });
 
   final GameResult result;
@@ -24,4 +25,8 @@ class ResultsArgs {
 
   /// Achievements unlocked by this round.
   final List<Achievement> newBadges;
+
+  /// Server coin balance before this round (null offline). Coins earned are
+  /// shown once the round has synced and the balance has gone up.
+  final int? coinsBefore;
 }

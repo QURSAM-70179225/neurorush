@@ -8,7 +8,8 @@ import { levelFromXp } from './rewards';
 import { reserveDefaultUsername } from './usernames';
 import { InvalidInput, parseSession, validateSession } from './validation';
 import { isoWeekId } from './weeks';
-import { advanceStreak, localDayOf } from './economyRules';
+import { advanceStreak, capDailyCoins, CoinEarnState, coinsForRound, localDayOf } from './economyRules';
+import { economy } from './config';
 
 export interface SubmitResult {
   status: 'accepted' | 'duplicate' | 'rejected';
@@ -22,6 +23,7 @@ export interface SubmitResult {
   streak?: number;
   freezesUsed?: number;
   freezeEarned?: boolean;
+  coinsEarned?: number;
 }
 
 /**
@@ -66,6 +68,7 @@ export const submitGameSession = onCall({ region: REGION }, async (req): Promise
   }
 
   const weekId = isoWeekId(new Date(now));
+  const econ = await economy();
   return db.runTransaction(async (tx): Promise<SubmitResult> => {
     const sessionRef = db.doc(paths.session(s.id));
     const userRef = db.doc(paths.user(uid));
@@ -110,6 +113,21 @@ export const submitGameSession = onCall({ region: REGION }, async (req): Promise
     const unlockedBefore = Object.keys((achSnap.get('unlocked') as Record<string, unknown>) ?? {});
     const fresh = newlyUnlocked(achievementStats(profile, bestStreak), unlockedBefore);
 
+    // Coins for playing: repeatable parts are capped per day, one-offs are not.
+    const newDay = streakResult.streak.lastDay !== ((userData.streakDay as string | undefined) ?? null);
+    const earned = coinsForRound(
+      {
+        stars,
+        newDay,
+        streak: streakResult.streak.current,
+        levelsGained: profile.level - Number(userData.level ?? 1),
+        newAchievements: fresh.length,
+      },
+      econ,
+    );
+    const capped = capDailyCoins(userData.coinEarn as CoinEarnState | undefined, new Date(now).toISOString().slice(0, 10), earned.repeatable, econ.coins_daily_cap);
+    const coinsEarned = capped.granted + earned.oneOff;
+
     // --- writes ---
     if (!userData.username) {
       tx.set(db.doc(paths.username(username)), { uid, createdAt: FieldValue.serverTimestamp() });
@@ -122,6 +140,7 @@ export const submitGameSession = onCall({ region: REGION }, async (req): Promise
       stars,
       xp,
       boosted,
+      coinsEarned,
       weekId,
       createdAt: FieldValue.serverTimestamp(),
     });
@@ -134,6 +153,8 @@ export const submitGameSession = onCall({ region: REGION }, async (req): Promise
         bestStreak: streakResult.streak.best,
         streakDay: streakResult.streak.lastDay,
         freezes: streakResult.freezes,
+        coins: Number(userData.coins ?? 0) + coinsEarned,
+        coinEarn: capped.state,
         ...(boosted ? { pendingBoosts: { [s.id]: FieldValue.delete() } } : {}),
         lastSessionAt: Timestamp.fromMillis(s.playedAt),
         createdAt: userData.createdAt ?? FieldValue.serverTimestamp(),
@@ -173,6 +194,7 @@ export const submitGameSession = onCall({ region: REGION }, async (req): Promise
       streak: streakResult.streak.current,
       freezesUsed: streakResult.freezesUsed,
       freezeEarned: streakResult.freezeEarned,
+      coinsEarned,
     };
   });
 });

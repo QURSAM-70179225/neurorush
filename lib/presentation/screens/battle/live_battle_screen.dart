@@ -470,6 +470,8 @@ class _Result extends ConsumerWidget {
           Text('${s.myScore} – ${s.opponentScore} vs ${s.opponentName}', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           Text('${delta >= 0 ? '+' : ''}$delta trophies', style: theme.textTheme.titleLarge),
+          if ((s.battle.coinDelta[s.myUid] ?? 0) > 0)
+            Text('+${s.battle.coinDelta[s.myUid]} coins', style: theme.textTheme.titleMedium?.copyWith(color: AppPalette.amber)),
           const SizedBox(height: 28),
           FilledButton.icon(
             onPressed: () async {

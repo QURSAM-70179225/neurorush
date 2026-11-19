@@ -8,6 +8,7 @@ class AppConfig {
     this.themePriceCoins = 300,
     this.freezePriceCoins = 100,
     this.freeEndlessPerDay = 10,
+    this.coinsDailyCap = 300,
   });
 
   final int interstitialEveryNGames;
@@ -19,6 +20,9 @@ class AppConfig {
   final int freezePriceCoins;
   final int freeEndlessPerDay;
 
+  /// Display only — the server enforces its own cap.
+  final int coinsDailyCap;
+
   static const defaults = <String, Object>{
     'interstitial_every_n_games': 3,
     'interstitial_min_interval_seconds': 120,
@@ -26,5 +30,6 @@ class AppConfig {
     'theme_price_coins': 300,
     'freeze_price_coins': 100,
     'free_endless_per_day': 10,
+    'coins_daily_cap': 300,
   };
 }

@@ -101,6 +101,45 @@ export const ECONOMY_DEFAULTS = {
   coins_large_amount: 3000,
   rewarded_daily_limit: 10,
   free_endless_per_day: 10,
+  // Coins earned by playing.
+  coins_per_star: 5,
+  coins_new_day: 20,
+  coins_streak_week: 100,
+  coins_level_up: 50,
+  coins_achievement: 25,
+  coins_battle_win: 30,
+  coins_bot_win: 10,
+  coins_endless_solve: 2,
+  /** Cap on repeatable earnings (stars, daily, battles, Endless) per UTC day. */
+  coins_daily_cap: 300,
 };
 export type Economy = typeof ECONOMY_DEFAULTS;
 
+
+/** Coins earned by one accepted round, split into capped and one-off parts. */
+export function coinsForRound(
+  r: { stars: number; newDay: boolean; streak: number; levelsGained: number; newAchievements: number },
+  e: Economy,
+): { repeatable: number; oneOff: number } {
+  const repeatable =
+    r.stars * e.coins_per_star +
+    (r.newDay ? e.coins_new_day : 0) +
+    (r.newDay && r.streak > 0 && r.streak % FREEZE_MILESTONE === 0 ? e.coins_streak_week : 0);
+  const oneOff = Math.max(0, r.levelsGained) * e.coins_level_up + r.newAchievements * e.coins_achievement;
+  return { repeatable, oneOff };
+}
+
+export interface CoinEarnState {
+  day: string;
+  amount: number;
+}
+
+/**
+ * Applies the daily cap to [amount] repeatable coins. Returns what is
+ * actually granted and the updated per-day counter.
+ */
+export function capDailyCoins(state: CoinEarnState | undefined, today: string, amount: number, cap: number): { granted: number; state: CoinEarnState } {
+  const used = state?.day === today ? state.amount : 0;
+  const granted = Math.max(0, Math.min(amount, cap - used));
+  return { granted, state: { day: today, amount: used + granted } };
+}

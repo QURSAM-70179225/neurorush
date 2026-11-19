@@ -121,7 +121,8 @@ test('endless: verified AI puzzle, answer hidden, validated on the server, lives
 
   const puzzle = PUZZLES.find((x) => x.question === p1.result!.question)!;
   const ok = await call<{ correct: boolean; run: number; lives: number; explanation: string }>('submitEndlessAnswer', u.token, { puzzleId: p1.result!.puzzleId, answerIndex: puzzle.answerIndex });
-  expect(ok.result).toMatchObject({ correct: true, run: 1, lives: 3, answerIndex: puzzle.answerIndex });
+  expect(ok.result).toMatchObject({ correct: true, run: 1, lives: 3, answerIndex: puzzle.answerIndex, coinsEarned: 2 });
+  expect((await db.doc(`users/${u.uid}`).get()).get('coins')).toBe(2);
   expect(ok.result?.explanation).toBe(puzzle.explanation);
 
   const twice = await call('submitEndlessAnswer', u.token, { puzzleId: p1.result!.puzzleId, answerIndex: puzzle.answerIndex });
@@ -133,7 +134,7 @@ test('endless: verified AI puzzle, answer hidden, validated on the server, lives
     const right = PUZZLES.find((x) => x.question === p.result!.question)!.answerIndex;
     const wrong = await call<{ correct: boolean; lives: number; gameOver: boolean; bestRun: number }>('submitEndlessAnswer', u.token, { puzzleId: p.result!.puzzleId, answerIndex: (right + 1) % 4 });
     lives--;
-    expect(wrong.result).toMatchObject({ correct: false, lives, gameOver: lives === 0, bestRun: 1 });
+    expect(wrong.result).toMatchObject({ correct: false, lives, gameOver: lives === 0, bestRun: 1, coinsEarned: 0 });
   }
   const fresh = await call<{ run: number; lives: number }>('getEndlessPuzzle', u.token, {});
   expect(fresh.result).toMatchObject({ run: 0, lives: 3 });

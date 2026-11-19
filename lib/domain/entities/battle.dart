@@ -63,6 +63,7 @@ class Battle {
     this.inviteCode,
     this.winner,
     this.trophyDelta = const {},
+    this.coinDelta = const {},
   });
 
   final String id;
@@ -78,6 +79,9 @@ class Battle {
   final String? inviteCode;
   final String? winner;
   final Map<String, int> trophyDelta;
+
+  /// Coins each player earned (wins; subject to the daily cap).
+  final Map<String, int> coinDelta;
 
   int get count => questions.length;
 

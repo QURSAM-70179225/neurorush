@@ -78,6 +78,7 @@ class FirebaseBattleRepository implements BattleRepository {
       inviteCode: d['inviteCode'] as String?,
       winner: d['winner'] as String?,
       trophyDelta: {for (final e in (d['trophyDelta'] as Map? ?? {}).entries) e.key as String: _i(e.value)},
+      coinDelta: {for (final e in (d['coinDelta'] as Map? ?? {}).entries) e.key as String: _i(e.value)},
     );
   }
 

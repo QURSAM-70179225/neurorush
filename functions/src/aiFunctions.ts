@@ -8,7 +8,7 @@ import { CoachInput, DaySession, fallbackCoachTip, generateCoachTip } from './ai
 import { GroqClient, LlmClient } from './ai/llm';
 import { CHOICES, generatedSequencePuzzle, generateVerifiedPuzzle, Puzzle, puzzleHash } from './ai/puzzles';
 import { db, REGION } from './db';
-import { proActive } from './economyRules';
+import { capDailyCoins, CoinEarnState, proActive } from './economyRules';
 import { economy } from './config';
 
 /** Set with: firebase functions:secrets:set GROQ_API_KEY */
@@ -202,6 +202,7 @@ export const submitEndlessAnswer = onCall({ region: REGION }, async (req) => {
     throw new HttpsError('invalid-argument', 'bad answerIndex');
   }
   const today = new Date().toISOString().slice(0, 10);
+  const econ = await economy();
   return db.runTransaction(async (tx) => {
     const pRef = db.doc(`endlessPuzzles/${puzzleId}`);
     const uRef = db.doc(`users/${uid}`);
@@ -220,8 +221,13 @@ export const submitEndlessAnswer = onCall({ region: REGION }, async (req) => {
       state.lives = Math.max(0, state.lives - 1);
     }
     if (state.activePuzzleId === puzzleId) state.activePuzzleId = null;
+    const capped = capDailyCoins(u.get('coinEarn') as CoinEarnState | undefined, today, correct ? econ.coins_endless_solve : 0, econ.coins_daily_cap);
     tx.update(pRef, { answered: true, correct, givenIndex: answerIndex, answeredAt: FieldValue.serverTimestamp() });
-    tx.set(uRef, { endless: state }, { merge: true });
+    tx.set(
+      uRef,
+      { endless: state, ...(capped.granted > 0 ? { coins: FieldValue.increment(capped.granted), coinEarn: capped.state } : {}) },
+      { merge: true },
+    );
     return {
       correct,
       timedOut: !inTime,
@@ -231,6 +237,7 @@ export const submitEndlessAnswer = onCall({ region: REGION }, async (req) => {
       lives: state.lives,
       bestRun: state.bestRun,
       gameOver: state.lives === 0,
+      coinsEarned: capped.granted,
     };
   });
 });

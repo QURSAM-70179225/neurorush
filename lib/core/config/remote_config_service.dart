@@ -22,5 +22,6 @@ Future<AppConfig> loadAppConfig(FirebaseRemoteConfig rc) async {
     themePriceCoins: rc.getInt('theme_price_coins'),
     freezePriceCoins: rc.getInt('freeze_price_coins'),
     freeEndlessPerDay: rc.getInt('free_endless_per_day'),
+    coinsDailyCap: rc.getInt('coins_daily_cap'),
   );
 }

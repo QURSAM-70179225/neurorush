@@ -164,6 +164,14 @@ Create these keys in **two** templates: **Client** (app display and ad frequency
 | `free_endless_per_day` | 10 | client + server | free Endless puzzles per day |
 | `coins_small_amount` / `coins_medium_amount` / `coins_large_amount` | 500 / 1200 / 3000 | server | coins per pack |
 | `rewarded_daily_limit` | 10 | server | rewarded-ad grants per player per day |
+| `coins_per_star` | 5 | server | coins per star in a round |
+| `coins_new_day` | 20 | server | first accepted round of the day |
+| `coins_streak_week` | 100 | server | bonus on every 7th streak day |
+| `coins_level_up` | 50 | server | per player level gained (not capped) |
+| `coins_achievement` | 25 | server | per badge unlocked (not capped) |
+| `coins_battle_win` / `coins_bot_win` | 30 / 10 | server | winning a ranked or invite battle / beating Neo |
+| `coins_endless_solve` | 2 | server | per Endless puzzle solved |
+| `coins_daily_cap` | 300 | client + server | max coins per day from stars, daily bonus, battles and Endless |
 
 ### Streaks and freezes (server-side)
 - **Streaks:** `submitGameSession` counts the streak in the player's local days (the app sends its time-zone offset).
@@ -266,7 +274,7 @@ The bundle is written to `build/app/outputs/bundle/release/app-release.aab`. Rel
 | `users/{uid}.endless` | server | `day, used, run, lives, bestRun, solved, activePuzzleId, recent[hash…50]` |
 | `purchases/{sha256(token)}` | server only | `uid, productId, kind, orderId, purchaseToken, coins, expiresAt, consumed, voided, createdAt` |
 | `rewardGrants/{sha256(transactionId)}` | server only (AdMob SSV) | `uid, reward, nonce, sessionId, claimed, result, verifiedAt, claimedAt` |
-| `users/{uid}` (server, Phase 6) | | `coins, freezes, currentStreak, bestStreak, streakDay, entitlements{removeAds, pro, proExpiresAt, themes[]}, adRewards{day,count}, pendingBoosts{sessionId}` |
+| `users/{uid}` (server, Phase 6) | | `coins, coinEarn{day,amount}, freezes, currentStreak, bestStreak, streakDay, entitlements{removeAds, pro, proExpiresAt, themes[]}, adRewards{day,count}, pendingBoosts{sessionId}` |
 | `battles/{id}` | server; readable by its 2 players | `mode (random/invite/bot), status (waiting/active/finished/expired), players[2], playerInfo{uid:{username,displayName,trophies,level}}, questions[8] (no answers), count, questionMs, startAt, endsAt, scores{uid}, answers{uid:{i:{correct,points,ms}}}, winner, trophyDelta{uid}, inviteCode, host, createdAt, finishedAt` |
 | `battles/{id}/secret/answers` | server only | `answers[8]`, `bot[8]{correct,ms}` |
 | `matchQueue/{uid}` | server; owner reads | `uid, info, battleId, createdAt` |

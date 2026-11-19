@@ -198,3 +198,40 @@ test('account deletion removes the player everywhere', async () => {
   expect(lookup.ok).toBe(false); // the sign-in account is gone
   void Timestamp;
 });
+
+test('coins for playing: rounds, level-ups, badges, battles and Endless, with a daily cap', async () => {
+  const u = await newUser();
+  // First round: 1 star (5) + first round of the day (20) + level 1→2 (50) + badges.
+  const s1 = { id: `coin-${Date.now()}-a`, gameId: 'speed_math', score: 1900, correct: 20, wrong: 0, maxCombo: 20, maxLevel: 5, avgReactionMs: 900, bestReactionMs: 400, playedAt: Date.now() - 200_000, durationSeconds: 60 };
+  const r1 = await call<{ coinsEarned: number; newAchievements: string[]; level: number; stars: number }>('submitGameSession', u, { session: s1, tzOffsetMinutes: 0 });
+  const expected = r1.result!.stars * 5 + 20 + (r1.result!.level - 1) * 50 + r1.result!.newAchievements.length * 25;
+  expect(r1.result!.coinsEarned).toBe(expected);
+  expect((await user(u.uid)).coins).toBe(expected);
+
+  // Near the daily cap only the remainder of repeatable coins is granted.
+  const today = new Date().toISOString().slice(0, 10);
+  await db.doc(`users/${u.uid}`).set({ coinEarn: { day: today, amount: 297 } }, { merge: true });
+  const s2 = { ...s1, id: `coin-${Date.now()}-b`, playedAt: Date.now() - 100_000 };
+  const r2 = await call<{ coinsEarned: number; newAchievements: string[]; level: number }>('submitGameSession', u, { session: s2, tzOffsetMinutes: 0 });
+  expect(r2.result!.coinsEarned).toBe(3 + r2.result!.newAchievements.length * 25 + (r2.result!.level - r1.result!.level) * 50);
+  expect((await user(u.uid)).coinEarn).toEqual({ day: today, amount: 300 });
+
+  // Capped: a won battle pays nothing more today, but the battle records it.
+  await db.doc(`users/${u.uid}`).set({ coinEarn: { day: today, amount: 0 } }, { merge: true });
+  const before = (await user(u.uid)).coins;
+  const bot = await call<{ battleId: string }>('startBotBattle', u);
+  const id = bot.result!.battleId;
+  const b = (await db.doc(`battles/${id}`).get()).data()!;
+  const right = (await db.doc(`battles/${id}/secret/answers`).get()).get('answers') as number[];
+  const start = (b.startAt as Timestamp).toMillis();
+  for (let i = 0; i < b.count; i++) {
+    await new Promise((r) => setTimeout(r, Math.max(0, start + i * b.questionMs + 100 - Date.now())));
+    await call('submitBattleAnswer', u, { battleId: id, index: i, choice: right[i] });
+  }
+  await new Promise((r) => setTimeout(r, Math.max(0, (b.endsAt as Timestamp).toMillis() - Date.now() + 100)));
+  const fin = await call<{ winner: string; coinDelta: Record<string, number> }>('finishBattle', u, { battleId: id });
+  expect(fin.result!.winner).toBe(u.uid);
+  expect(fin.result!.coinDelta[u.uid]).toBe(10);
+  expect((await user(u.uid)).coins).toBe(before + 10);
+  expect((await db.doc(`battles/${id}`).get()).get('coinDelta')).toEqual({ [u.uid]: 10 });
+});

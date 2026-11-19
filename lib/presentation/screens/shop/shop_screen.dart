@@ -155,6 +155,35 @@ class ShopScreen extends ConsumerWidget {
             ),
           ),
           const SectionHeader('Coins'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Earn coins by playing', style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  for (final line in const [
+                    'Stars in every round',
+                    'Your first round each day, plus a bonus every 7-day streak',
+                    'Levelling up and unlocking badges',
+                    'Winning battles and solving Endless puzzles',
+                  ])
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(children: [
+                        const Icon(Icons.monetization_on_rounded, size: 16, color: AppPalette.amber),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(line)),
+                      ]),
+                    ),
+                  const SizedBox(height: 4),
+                  Text('Up to ${config.coinsDailyCap} coins a day from rounds, battles and puzzles; level-ups and badges always pay.',
+                      style: theme.textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ),
           for (final (id, label) in const [
             (ProductIds.coinsSmall, 'Handful of coins'),
             (ProductIds.coinsMedium, 'Bag of coins'),

@@ -26,6 +26,7 @@ Battle battle({
   Map<String, Map<int, BattleAnswer>> answers = const {},
   String? winner,
   Map<String, int> delta = const {},
+  Map<String, int> coins = const {},
   BattleMode mode = BattleMode.random,
   String? code,
 }) =>
@@ -45,6 +46,7 @@ Battle battle({
       answers: answers,
       winner: winner,
       trophyDelta: delta,
+      coinDelta: coins,
       inviteCode: code,
     );
 
@@ -100,6 +102,7 @@ void main() {
           scores: const {testUid: 360, opp: 100},
           winner: testUid,
           delta: const {testUid: 30, opp: -20},
+          coins: const {testUid: 30, opp: 0},
         ));
     await tester.pumpWidget(app('/battle/b1'));
     await tester.pump();
@@ -136,6 +139,7 @@ void main() {
     expect(repo.calls, contains('finish'));
     expect(find.text('You won!'), findsOneWidget);
     expect(find.text('+30 trophies'), findsOneWidget);
+    expect(find.text('+30 coins'), findsOneWidget);
     expect(find.text('360 – 100 vs @omar'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3)); // let confetti finish
   });

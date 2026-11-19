@@ -1,7 +1,7 @@
 import { createSign, generateKeyPairSync } from 'crypto';
 import { setKeyFetcher, verifySsv } from '../src/ssv';
 import { checkProduct, checkSubscription, grantFor, obfuscatedAccountId, PRODUCTS } from '../src/billingRules';
-import { addDays, advanceStreak, ECONOMY_DEFAULTS, localDayOf, parseRewardCustomData, proActive } from '../src/economyRules';
+import { addDays, advanceStreak, capDailyCoins, coinsForRound, ECONOMY_DEFAULTS, localDayOf, parseRewardCustomData, proActive } from '../src/economyRules';
 
 describe('server streaks', () => {
   const s0 = { current: 0, best: 0, lastDay: null };
@@ -97,5 +97,24 @@ describe('AdMob SSV signatures', () => {
     expect(await verifySsv(signed(q).replace('user_id=u1', 'user_id=u2'))).toBeNull();
     expect(await verifySsv(signed(q).replace('key_id=42', 'key_id=7'))).toBeNull();
     expect(await verifySsv(q)).toBeNull();
+  });
+});
+
+describe('coins for playing', () => {
+  const e = ECONOMY_DEFAULTS;
+  test('stars, first round of the day and weekly streak bonus are repeatable', () => {
+    expect(coinsForRound({ stars: 3, newDay: false, streak: 4, levelsGained: 0, newAchievements: 0 }, e)).toEqual({ repeatable: 15, oneOff: 0 });
+    expect(coinsForRound({ stars: 2, newDay: true, streak: 4, levelsGained: 0, newAchievements: 0 }, e)).toEqual({ repeatable: 30, oneOff: 0 });
+    expect(coinsForRound({ stars: 0, newDay: true, streak: 7, levelsGained: 0, newAchievements: 0 }, e)).toEqual({ repeatable: 120, oneOff: 0 });
+    expect(coinsForRound({ stars: 0, newDay: false, streak: 7, levelsGained: 0, newAchievements: 0 }, e).repeatable).toBe(0);
+  });
+  test('level-ups and new badges are one-off and uncapped', () => {
+    expect(coinsForRound({ stars: 1, newDay: false, streak: 1, levelsGained: 2, newAchievements: 3 }, e)).toEqual({ repeatable: 5, oneOff: 175 });
+  });
+  test('daily cap', () => {
+    expect(capDailyCoins(undefined, '2026-11-19', 50, 300)).toEqual({ granted: 50, state: { day: '2026-11-19', amount: 50 } });
+    expect(capDailyCoins({ day: '2026-11-19', amount: 290 }, '2026-11-19', 50, 300)).toEqual({ granted: 10, state: { day: '2026-11-19', amount: 300 } });
+    expect(capDailyCoins({ day: '2026-11-19', amount: 300 }, '2026-11-19', 50, 300).granted).toBe(0);
+    expect(capDailyCoins({ day: '2026-11-18', amount: 300 }, '2026-11-19', 50, 300).granted).toBe(50); // new day resets
   });
 });

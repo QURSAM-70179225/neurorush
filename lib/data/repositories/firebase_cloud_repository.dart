@@ -344,6 +344,7 @@ class FirebaseCloudRepository implements CloudRepository {
       bestRun: _int(r['bestRun']),
       gameOver: r['gameOver'] == true,
       timedOut: r['timedOut'] == true,
+      coinsEarned: _int(r['coinsEarned']),
     );
   }
 

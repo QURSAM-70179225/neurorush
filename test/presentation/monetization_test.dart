@@ -231,6 +231,26 @@ void main() {
     expect(auth.currentUser, isNull);
   });
 
+  testWidgets('Results: coins earned appear once the server balance goes up', (tester) async {
+    usePhoneSize(tester);
+    final r = sampleResult(id: 'round-coins1');
+    await tester.pumpWidget(app(ResultsScreen(args: ResultsArgs(result: r, justPlayed: true, coinsBefore: 100)),
+        profile: const CloudProfile(uid: testUid, entitlements: Entitlements(coins: 100))));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('coins', skipOffstage: false), findsNothing);
+    cloud.emitProfile(const CloudProfile(uid: testUid, entitlements: Entitlements(coins: 145)));
+    await tester.pumpAndSettle();
+    expect(find.text('+45 coins', skipOffstage: false), findsOneWidget);
+  });
+
+  testWidgets('Shop explains how to earn coins', (tester) async {
+    usePhoneSize(tester);
+    await tester.pumpWidget(app(const ShopScreen(), profile: const CloudProfile(uid: testUid)));
+    await tester.pumpAndSettle();
+    await scrollTo(tester, find.text('Earn coins by playing'));
+    expect(find.textContaining('Up to 300 coins a day'), findsOneWidget);
+  });
+
   testWidgets('Privacy policy screen', (tester) async {
     usePhoneSize(tester);
     await tester.pumpWidget(const MaterialApp(home: PrivacyScreen()));

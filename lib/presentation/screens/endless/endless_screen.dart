@@ -338,6 +338,8 @@ class _PuzzleView extends StatelessWidget {
               style: theme.textTheme.headlineSmall?.copyWith(color: v.correct ? AppPalette.mint : AppPalette.flame),
             ),
           ),
+          if (v.coinsEarned > 0)
+            Text('+${v.coinsEarned} coins', style: theme.textTheme.titleSmall?.copyWith(color: AppPalette.amber)),
           const SizedBox(height: 4),
           Text(v.explanation, style: theme.textTheme.bodyLarge),
           const SizedBox(height: 16),

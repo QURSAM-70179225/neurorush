@@ -9,6 +9,8 @@ import {
 } from './battleRules';
 import { db, REGION } from './db';
 import { sendPush } from './push';
+import { economy } from './config';
+import { capDailyCoins, CoinEarnState } from './economyRules';
 
 export const BOT_UID = 'neo-bot';
 /** Time per question; lowered only for emulator tests. */
@@ -262,11 +264,13 @@ export const tickBattle = onCall({ region: REGION }, async (req) => {
 /** Finishes a battle whose time is up: winner, trophies, stats. Idempotent. */
 export async function finish(battleId: string, now: number): Promise<Record<string, unknown>> {
   const ref = db.doc(`battles/${battleId}`);
+  const econ = await economy();
+  const today = new Date(now).toISOString().slice(0, 10);
   return db.runTransaction(async (tx) => {
     const [b, s] = await Promise.all([tx.get(ref), tx.get(ref.collection('secret').doc('answers'))]);
     if (!b.exists) throw new HttpsError('not-found', 'Battle not found.');
     const data = b.data()!;
-    if (data.status === 'finished') return { winner: data.winner, trophyDelta: data.trophyDelta, scores: data.scores };
+    if (data.status === 'finished') return { winner: data.winner, trophyDelta: data.trophyDelta, coinDelta: data.coinDelta ?? {}, scores: data.scores };
     if (data.status !== 'active') throw new HttpsError('failed-precondition', 'Battle has not started.');
     const ends = (data.endsAt as Timestamp).toMillis();
     if (now < ends - 300) throw new HttpsError('failed-precondition', `Battle ends in ${Math.ceil((ends - now) / 1000)} s.`);
@@ -281,17 +285,33 @@ export async function finish(battleId: string, now: number): Promise<Record<stri
     const userSnaps = await Promise.all(humans.map((p) => tx.get(db.doc(`users/${p}`))));
     const current = Object.fromEntries(userSnaps.map((u) => [u.id, (u.get('trophies') as number | undefined) ?? 0]));
     const result = trophyResult(data.mode as BattleMode, scores, current);
+    const coinDelta: Record<string, number> = {};
     for (const u of userSnaps) {
       const d = result.delta[u.id] ?? 0;
       const outcome = result.winner === null ? 'draws' : result.winner === u.id ? 'wins' : 'losses';
+      const win = result.winner === u.id ? (data.mode === 'bot' ? econ.coins_bot_win : econ.coins_battle_win) : 0;
+      const capped = capDailyCoins(u.get('coinEarn') as CoinEarnState | undefined, today, win, econ.coins_daily_cap);
+      coinDelta[u.id] = capped.granted;
       tx.set(
         u.ref,
-        { trophies: Math.max(0, (current[u.id] ?? 0) + d), battleStats: { played: FieldValue.increment(1), [outcome]: FieldValue.increment(1) } },
+        {
+          trophies: Math.max(0, (current[u.id] ?? 0) + d),
+          battleStats: { played: FieldValue.increment(1), [outcome]: FieldValue.increment(1) },
+          ...(capped.granted > 0 ? { coins: FieldValue.increment(capped.granted), coinEarn: capped.state } : {}),
+        },
         { merge: true },
       );
     }
-    tx.update(ref, { ...updates, scores, status: 'finished', winner: result.winner, trophyDelta: result.delta, finishedAt: FieldValue.serverTimestamp() });
-    return { winner: result.winner, trophyDelta: result.delta, scores };
+    tx.update(ref, {
+      ...updates,
+      scores,
+      status: 'finished',
+      winner: result.winner,
+      trophyDelta: result.delta,
+      coinDelta,
+      finishedAt: FieldValue.serverTimestamp(),
+    });
+    return { winner: result.winner, trophyDelta: result.delta, coinDelta, scores };
   });
 }
 

@@ -65,6 +65,7 @@ class EndlessVerdict {
     required this.bestRun,
     required this.gameOver,
     this.timedOut = false,
+    this.coinsEarned = 0,
   });
 
   final bool correct;
@@ -75,4 +76,5 @@ class EndlessVerdict {
   final int bestRun;
   final bool gameOver;
   final bool timedOut;
+  final int coinsEarned;
 }

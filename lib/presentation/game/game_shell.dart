@@ -175,6 +175,8 @@ class _GameShellState extends ConsumerState<GameShell>
     );
     final badgesBefore = ref.read(unlockedAchievementsProvider).keys.toSet();
     final workoutDoneBefore = ref.read(dailyWorkoutProvider).isComplete;
+    final profileBefore = ref.read(cloudProfileProvider).value;
+    final coinsBefore = ref.read(cloudRepositoryProvider).isAvailable && profileBefore != null ? profileBefore.entitlements.coins : null;
     final levelBefore = ref.read(levelProvider).level;
     final streakBefore = ref.read(streakProvider).current;
     final stored = await ref.read(gameHistoryProvider.notifier).add(result);
@@ -210,6 +212,7 @@ class _GameShellState extends ConsumerState<GameShell>
           leveledUpTo: levelAfter > levelBefore ? levelAfter : null,
           streakExtendedTo: streakAfter > streakBefore ? streakAfter : null,
           newBadges: newBadges,
+          coinsBefore: coinsBefore,
         ),
       );
     }

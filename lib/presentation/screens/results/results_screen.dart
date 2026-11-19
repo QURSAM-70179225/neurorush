@@ -85,7 +85,9 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
   @override
   Widget build(BuildContext context) {
     // Keep entitlements loaded so the interstitial check never sees stale data.
-    ref.watch(entitlementsProvider);
+    final coinsNow = ref.watch(entitlementsProvider).coins;
+    final before = widget.args.coinsBefore;
+    final coinsGained = widget.args.justPlayed && before != null && coinsNow > before ? coinsNow - before : 0;
     final r = _result;
     final theme = Theme.of(context);
     final gradient = AppPalette.gameGradient(r.gameType);
@@ -175,6 +177,13 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
                     title: '$days-day streak!',
                     subtitle: days == 1 ? 'Come back tomorrow to keep it going.' : 'Keep the flame alive tomorrow.',
                   ).animate(delay: 1500.ms).fadeIn().slideY(begin: 0.3),
+                if (coinsGained > 0)
+                  _Banner(
+                    icon: Icons.monetization_on_rounded,
+                    color: AppPalette.amber,
+                    title: '+$coinsGained coins',
+                    subtitle: 'Spend them in the Shop on streak freezes and themes.',
+                  ).animate().fadeIn().scale(begin: const Offset(0.9, 0.9), curve: Curves.easeOutBack),
                 for (final (i, b) in widget.args.newBadges.indexed)
                   _Banner(
                     icon: achievementIcon(b.icon),
